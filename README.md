@@ -1,6 +1,10 @@
 # firebase-real-time-collaborative-text-editor
 This is a real time, collaborative text editor I created myself from scratch; it utilizes nothing but Firebase!
 
+To try the live demo, check out https://simplexshotz.github.io/firebase-real-time-collaborative-text-editor/
+
+Note that you should use different UIDs if testing it on multiple devices. In an real-world setting, you would likely use Firebase Auth, which generates UIDs automatically for each user, which is perfect for this!
+
 All code is free to use.
 
 Currently, it only supports entering and deleting text (at any position), but I plan to add support for selections, cutting/pasting, cursor/active user display, and more.
