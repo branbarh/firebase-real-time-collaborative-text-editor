@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Editor Testing</title>
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        width: 100vw;
+        height: 100vh;
+        margin: 0px;
+        padding: 0px;
+        align-items: center;
+        justify-content: center;
+      }
+      #editor {
+        display: inline-block;
+        padding: 50px;
+        width: 60vw;
+        height: 50vh;
+        box-shadow: 0px 0px 10px rgb(225, 225, 225);
+        border-radius: 20px;
+        font-size: 1.2rem;
+        font-family: Helvetica;
+        transition: box-shadow 0.25s;
+      }
+      #editor:hover {
+        box-shadow: 0px 0px 10px rgb(200, 200, 200);
+      }
+      #editor:focus {
+        outline: none;
+        box-shadow: 0px 0px 10px rgb(200, 200, 200);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="editor" contenteditable="true"></div>
+    <script type="module">
+
+      // Things to make this even better:
+      // [DONE!!] Send data regarding the key that comes before/after it; this can then be used to error check and correctly position keys when pressed at the exact same time
+      // [DONE!!] Maximize the conditions met by checking the score if positioned one char to the right, or one char to the left (having the letters on both sides of the char to insert [2/2] is ideal; otherwise, shoot for [1/2]; if [0/0], leave the char where it is)
+      // [TODO] ALSO: periodically (not very often, however) pull the ACTUAl content stored in Firebase(?) perhaps only do this on blur and focus(?) ===> update the text region periodically, assuming that it is not currently being focused (elm !== document.activeElement)
+
+      // [TODO IMPORTANT] ==> remove old "changes" ( > 10 mins old (?))
+
+      /* also to implement:
+
+            - [DONE!!] deleting
+                ([TODO]including deleting selections of text)
+            - [TODO] pasting
+            - [TODO]  selecting text and then typing/pasting/etc. (perhaps handle these events (selecting text + whatever else) separately?)
+
+        [TODO] TO TEST: try out multiple docs!! the code should be setup for it already, just need to change depending on what div is focused :)
+
+      */
+
+      // [DONE!!] handle errors when not focused on anything and a change is sent
+
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-app.js";
+      import { getDatabase, set, get, ref, query, onValue, child, push, remove } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
+
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyDChSvCEHSlLxpl-oKr21_kjT3Z_1f-2Nw",
+        authDomain: "realtime-editor-testing.firebaseapp.com",
+        projectId: "realtime-editor-testing",
+        storageBucket: "realtime-editor-testing.appspot.com",
+        messagingSenderId: "905100052469",
+        appId: "1:905100052469:web:cfaf1072946694eea342bc"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+
+      let pending = [];
+      let applied = [];
+      let uid = prompt("enter uid");
+      let lastKeyPress;
+
+      window.addEventListener("load", async function() {
+        let content = await getData("docs/default/content", function(err) { console.error(err); });
+        document.getElementById("editor").innerText = content.text;
+
+        // Update the "applied" values:
+        let changesObj = await getData("docs/default/changes", function(err) { console.error(err); });
+        for (let i in changesObj) {
+          applied.push(i);
+        }
+
+        // Get new data coming in:
+        onValue(ref(db, "docs/default/changes"), (snapshot) => {
+          const changes = snapshot.val();
+          checkForChanges(changes);
+        });
+      });
+
+      document.getElementById("editor").addEventListener("keydown", async function(e) {
+
+        let caretPos = getCaretPosition(this);
+
+        if (e.keyCode === 13)
+          e.preventDefault();
+
+        // Handle backspace / delete:
+        if (e.keyCode === 8 && caretPos > 0 || e.keyCode === 46 && caretPos < this.textContent.length) {
+          buffer({
+            uid: uid,
+            timestamp: getTime(),
+            action: "delete",
+            content: "",
+            index: caretPos - (e.keyCode === 8 ? 1 : 0),
+            surrounding: {
+              before: this.textContent[caretPos - 1 - (e.keyCode === 8 ? 1 : 0)] || false,
+              after: this.textContent[caretPos + (e.keyCode === 46 ? 1 : 0)] || false
+            }
+          });
+
+          lastKeyPress = getTime();
+          attemptToPushChanges(lastKeyPress);
+        }
+
+        if (e.ctrlKey || e.altKey || e.key.length > 1)
+          return;
+
+        buffer({
+          uid: uid,
+          timestamp: getTime(),
+          action: "type",
+          content: e.key,
+          index: caretPos,
+          surrounding: {
+            before: this.textContent[caretPos - 1] || false,
+            after: this.textContent[caretPos] || false
+          }
+        });
+
+        lastKeyPress = getTime();
+        attemptToPushChanges(lastKeyPress);
+
+      });
+
+      async function attemptToPushChanges(t) {
+
+        // Check for changes on the server side:
+        let changesObj = await getData("docs/default/changes", function(err) { console.error(err); });
+
+        // This will check for changes and apply them if found; otherwise, the function will return false
+        if (!checkForChanges(changesObj, t)) {
+
+          // No changes to handle; push pending changes
+          while (pending.length > 0) {
+            set(push(child(ref(db), "docs/default/changes")), pending.splice(0, 1)[0]);
+          }
+          // [TODO] update this periodically?
+          set(ref(db, "docs/default/content"), {
+            text: document.getElementById("editor").textContent,
+            updated: getTime()
+          });
+        }
+
+      }
+
+      function checkForChanges(changesObj, t) {
+
+        // Orgainze the changes:
+        let changes = [];
+        for (let i in changesObj) {
+
+          // Check if this change has already been applied:
+          if (applied.indexOf(i) !== -1)
+            continue;
+
+          // Otherwise, we will apply this change:
+          changes.push({
+            uid: changesObj[i].uid,
+            timestamp: changesObj[i].timestamp,
+            action: changesObj[i].action,
+            content: changesObj[i].content,
+            index: changesObj[i].index,
+            surrounding: {
+              before: changesObj[i].surrounding.before,
+              after: changesObj[i].surrounding.after
+            },
+            key: i
+          });
+        }
+
+        // No changes to be made!
+        if (changes.length === 0)
+          return false;
+
+        // Otherwise, we have at least one change to handle:
+        quicksort(changes, 0, changes.length - 1, "timestamp");
+
+        // Apply changes:
+        for (let i = 0; i < changes.length; i++) {
+          if (changes[i].uid !== uid) {
+            applyChange(changes[i]);
+          }
+          applied.push(changes[i].key);
+        }
+
+        // If no pending changes have been made since the last keypress, try again
+        if (t && t === lastKeyPress) {
+          attemptToPushChanges();
+        }
+
+        return true;
+
+      }
+
+      function applyChange(c) {
+
+        // Store the caret position and text content of the editor:
+        let caretPos = getCaretPosition(document.getElementById("editor"));
+        let t = document.getElementById("editor").textContent;
+
+        let reach = 10; // This determines the maximum distance the character can be moved; default is 10
+        let fitScores;
+
+        switch(c.action) {
+          case "type":
+            // Transform the positions:
+            for (let i = 0; i < pending.length; i++) {
+              // The pending text comes before the index where the text is to be inserted; therefore, move the text to be inserted over
+              if (pending[i].index <= c.index) {
+                c.index++;
+              }
+            }
+
+            // Check if the text to be inserted fits here or not:
+            fitScores = {
+              before: {
+                scores: [],
+                max: -1
+              },
+              at: (((c.index - 1 >= 0 ? t[c.index - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index < t.length ? t[c.index] : false) === c.surrounding.after) ? 1 : 0),
+              after: {
+                scores: [],
+                max: -1
+              },
+              transform: 0
+            };
+
+            // Check how good of a fit moving the character before and after within a certain reach would be:
+            for (let i = 0; i < reach; i++) {
+              fitScores.before.scores.push((((c.index - 2 - i >= 0 ? t[c.index - 2 - i] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - 1 - i >= 0 ? t[c.index - 1 - i] : false) === c.surrounding.after) ? 1 : 0));
+              fitScores.after.scores.push((((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + 1 + i < t.length ? t[c.index + 1 + i] : false) === c.surrounding.after) ? 1 : 0));
+            }
+
+            // Determine the ideal scores for moving the text to be inserted before / after:
+            fitScores.before.max = Math.max(...fitScores.before.scores);
+            fitScores.after.max = Math.max(...fitScores.after.scores);
+
+            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
+            if (fitScores.at !== 2 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
+              // If it's better to place the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be placed):
+              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
+                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
+
+              // If it's better to place the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
+              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
+                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
+
+            }
+
+            // Move the character accordingly:
+            c.index += fitScores.transform;
+
+            // The text to be inserted comes before the caret position; therefore, move the caret position over
+            if (caretPos && c.index < caretPos) {
+              caretPos++;
+            }
+            for (let i = 0; i < pending.length; i++) {
+              // The text to be inserted comes before the pending text; therefore, move the pending text over
+              if (c.index < pending[i].index) {
+                pending[i].index++;
+              }
+            }
+
+            // Insert the text:
+            if (c.content === " ")
+              c.content = String.fromCharCode(160);
+            document.getElementById("editor").textContent = t.substring(0, c.index) + c.content + t.substring(c.index);
+
+            // Set the caret to its new position (but only if element is focused):
+            if (caretPos)
+              setCaretPosition(document.getElementById("editor"), caretPos);
+          break;
+          case "delete":
+            // Transform the positions:
+            for (let i = 0; i < pending.length; i++) {
+              // The pending text comes before the index where the text is to be removed; therefore, move the text to be inserted over
+              if (pending[i].index <= c.index) {
+                c.index++;
+              }
+            }
+
+            // Check if the text to be removed fits here or not:
+            fitScores = {
+              before: {
+                scores: [],
+                max: -1
+              },
+              at: (((c.index - 1 >= 0 ? t[c.index - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + 1 < t.length ? t[c.index + 1] : false) === c.surrounding.after) ? 1 : 0),
+              after: {
+                scores: [],
+                max: -1
+              },
+              transform: 0
+            };
+
+            // Check how good of a fit removing the character before and after within a certain reach would be:
+            for (let i = 0; i < reach; i++) {
+              fitScores.before.scores.push((((c.index - 2 - i >= 0 ? t[c.index - 2 - i] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i < t.length ? t[c.index - i] : false) === c.surrounding.after) ? 1 : 0));
+              fitScores.after.scores.push((((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + 2 + i < t.length ? t[c.index + 2 + i] : false) === c.surrounding.after) ? 1 : 0));
+            }
+
+            // Determine the ideal scores for moving the text to be removed before / after:
+            fitScores.before.max = Math.max(...fitScores.before.scores);
+            fitScores.after.max = Math.max(...fitScores.after.scores);
+
+            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
+            if (fitScores.at !== 2 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
+              // If it's better to remove the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be removed):
+              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
+                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
+
+              // If it's better to remove the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
+              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
+                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
+
+            }
+
+            // Move the removal accordingly:
+            c.index += fitScores.transform;
+
+            // The text to be removed comes before the caret position; therefore, move the caret position over
+            if (caretPos && c.index < caretPos) {
+              caretPos--;
+            }
+            for (let i = 0; i < pending.length; i++) {
+              // The text to be removed comes before the pending text; therefore, move the pending text over
+              if (c.index < pending[i].index) {
+                pending[i].index--;
+              }
+            }
+
+            // Remove the text:
+            document.getElementById("editor").textContent = t.substring(0, c.index) + t.substring(c.index + 1);
+
+            // Set the caret to its new position (but only if element is focused):
+            if (caretPos)
+              setCaretPosition(document.getElementById("editor"), caretPos);
+          break;
+        }
+      }
+
+      async function getData(path, err) {
+
+        let data;
+        const dbref = ref(db);
+
+        await get(child(dbref, path)).then((snapshot) => {
+          if (!snapshot.exists())
+            return;
+
+          data = snapshot.val();
+        }).catch((error) => {
+          err(error);
+          console.error(error);
+        });
+
+        return data;
+      }
+
+      function buffer(data) {
+        pending.push(data);
+      }
+
+      function getCaretPosition(el) {
+
+        if (el !== document.activeElement)
+          return false;
+
+        let range = window.getSelection().getRangeAt(0);
+        let preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(el);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+
+        return preCaretRange.toString().length;
+
+      }
+
+      function setCaretPosition(el, pos) {
+
+        if (!el.childNodes[0])
+          return;
+
+        let range = document.createRange();
+        let sel = window.getSelection();
+
+        range.setStart(el.childNodes[0], pos);
+        range.collapse(true);
+
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+      }
+
+      function getTime() {
+        return (new Date().getTime() - new Date().getTimezoneOffset() * 60 * 1000);
+      }
+
+      function partition(arr, lo, hi, by) {
+        let pivot = (by ? arr[hi][by] : arr[hi]);
+        let i = lo;
+        for (let j = lo; j < hi; j++) {
+          if ((by ? arr[j][by] : arr[j]) < pivot) {
+            if (i !== j) {
+              let t = arr[j];
+              arr[j] = arr[i];
+              arr[i] = t;
+            }
+            i++;
+          }
+        }
+        let t = arr[hi];
+        arr[hi] = arr[i];
+        arr[i] = t;
+        return i;
+      }
+      function quicksort(arr, lo, hi, by) {
+        if (lo < hi) {
+          let p = partition(arr, lo, hi, by);
+          quicksort(arr, lo, p - 1, by);
+          quicksort(arr, p + 1, hi, by);
+        }
+      }
+
+    </script>
+  </body>
+</html>
