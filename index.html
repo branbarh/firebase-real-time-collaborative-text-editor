@@ -35,7 +35,7 @@
     </style>
   </head>
   <body>
-    <div id="editor" contenteditable="true"></div>
+    <div id="editor" contenteditable="plaintext-only"></div>
     <script type="module">
 
       // Things to make this even better:
@@ -83,7 +83,7 @@
 
       window.addEventListener("load", async function() {
         let content = await getData("docs/default/content", function(err) { console.error(err); });
-        document.getElementById("editor").innerText = content.text;
+        document.getElementById("editor").textContent = content.text;
 
         // Update the "applied" values:
         let changesObj = await getData("docs/default/changes", function(err) { console.error(err); });
@@ -101,9 +101,17 @@
       document.getElementById("editor").addEventListener("keydown", async function(e) {
 
         let caretPos = getCaretPosition(this);
+        let key;
 
-        if (e.keyCode === 13)
-          e.preventDefault();
+        // Handle enter:
+        if (e.keyCode === 13) {
+          // Prevent multiple lines from being added:
+          if (this.textContent[caretPos - 1] === "\n") {
+            e.preventDefault();
+            return;
+          }
+          key = "\n";
+        }
 
         // Handle backspace / delete:
         if (e.keyCode === 8 && caretPos > 0 || e.keyCode === 46 && caretPos < this.textContent.length) {
@@ -123,14 +131,14 @@
           attemptToPushChanges(lastKeyPress);
         }
 
-        if (e.ctrlKey || e.altKey || e.key.length > 1)
+        if (e.keyCode !== 13 && (e.ctrlKey || e.altKey || e.key.length > 1))
           return;
 
         buffer({
           uid: uid,
           timestamp: getTime(),
           action: "type",
-          content: e.key,
+          content: key || e.key,
           index: caretPos,
           surrounding: {
             before: this.textContent[caretPos - 1] || false,
@@ -214,6 +222,8 @@
       }
 
       function applyChange(c) {
+
+        console.log(c);
 
         // Store the caret position and text content of the editor:
         let caretPos = getCaretPosition(document.getElementById("editor"));
