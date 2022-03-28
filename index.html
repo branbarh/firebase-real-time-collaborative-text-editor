@@ -41,16 +41,38 @@
       // Things to make this even better:
       // [DONE!!] Send data regarding the key that comes before/after it; this can then be used to error check and correctly position keys when pressed at the exact same time
       // [DONE!!] Maximize the conditions met by checking the score if positioned one char to the right, or one char to the left (having the letters on both sides of the char to insert [2/2] is ideal; otherwise, shoot for [1/2]; if [0/0], leave the char where it is)
-      // [TODO] ALSO: periodically (not very often, however) pull the ACTUAl content stored in Firebase(?) perhaps only do this on blur and focus(?) ===> update the text region periodically, assuming that it is not currently being focused (elm !== document.activeElement)
-
-      // [TODO IMPORTANT] ==> remove old "changes" ( > 10 mins old (?))
+      // [DONE!!] ALSO: periodically (not very often, however) pull the ACTUAl content stored in Firebase(?) perhaps only do this on blur and focus(?) ===> update the text region periodically, assuming that it is not currently being focused (elm !== document.activeElement)
 
       /* also to implement:
 
             - [DONE!!] deleting
-                ([TODO]including deleting selections of text)
-            - [TODO] pasting
-            - [TODO]  selecting text and then typing/pasting/etc. (perhaps handle these events (selecting text + whatever else) separately?)
+                ([DONE!!]including deleting selections of text)
+            - [DONE!!] pasting
+            - [DONE!!]  selecting text and then typing/pasting/etc. (perhaps handle these events (selecting text + whatever else) separately?)
+
+        [DONE!!]: spaces (when typed) are not treated as char 160 on the client's end (e.preventDefault() is needed??) [FIXED BY CHANGING ALL TO SPACES]
+
+        [TODO]: sync in the background when not focused (ignore changes, basically)
+        [DONE!!]: periodically check sync(?)
+        [TODO IMPORTANT] ==> remove old "changes" ( > 10 mins old (?))
+
+        [TODO]: display cursor positions + selections => USE SPANS!!!
+
+        [TODO]: bold, italics, underlining, strikethrough, links
+
+        [DONE!!]: \n sometimes changes to \r (???? might've been bc i was screwing around with cursor stuff... might not be an issue but still test anyway)
+        [TODO]: sometimes when one person is typing and the other is typing / deletes, their cursor will jump to the start of the doc which is kinda annoying
+        [TODO]: if text is selected (ctrl + a) and end of selection is end of doc, and someone types something, keep end of selection at end of doc
+        [DONE!!]: handle ctrl + x
+        [DONE!!]: disable ctrl + delete
+        [TODO (MAYBE??)] implement custom ctrl + delete (replace until previous space with "" [nothing] - note that if character immediately before cursor is a space, that space should be ignored and deleted as well as the rest of the text content, like normal ctrl + delete)
+        [TODO]: enters at bottom of doc don't show up until after syncing (sometimes) + sometimes things show up on the wrong bottom line (oof)
+        [DONE!!]: pasting in content with line breaks does not work properly (yikes)
+
+        [TODO] before and after checking should stop at index -1 (or -2 idk) or at the end of the text content; otherwise, you might get false positives which is not ideal
+
+        [TODO (SOMEWHAT DONE!!)]: HANDLE dragging + dropping text??? [TODO]: allow when only 1 person editing
+        [TODO (SOMEWHAT DONE!!)] HANDLE CTRL + Z (should be disabled if multiple editors at same time; or immediate sync(?) assuming client is up-to-date) [TODO]: allow when only 1 person editing
 
         [TODO] TO TEST: try out multiple docs!! the code should be setup for it already, just need to change depending on what div is focused :)
 
@@ -58,7 +80,7 @@
 
       // [DONE!!] handle errors when not focused on anything and a change is sent
 
-      // Import the functions you need from the SDKs you need
+      // Import the needed functions from the SDKs
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-app.js";
       import { getDatabase, set, get, ref, query, onValue, child, push, remove } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
 
@@ -80,6 +102,11 @@
       let applied = [];
       let uid = prompt("enter uid");
       let lastKeyPress;
+      let prevContentUpdated = 0;
+      let contentCheck = 0;
+      let lastInputTimeStamp = 0;
+
+      let contentCheckDelay = 5; // [TODO]
 
       window.addEventListener("load", async function() {
         let content = await getData("docs/default/content", function(err) { console.error(err); });
@@ -96,6 +123,77 @@
           const changes = snapshot.val();
           checkForChanges(changes);
         });
+
+        // Check to ensure the clients are all synced properly:
+        onValue(ref(db, "docs/default/content"), (snapshot) => {
+          const content = snapshot.val();
+
+          // Ignore if the update is old:
+          if (content.updated >= prevContentUpdated) {
+            prevContentUpdated = content.updated
+          } else {
+            return;
+          }
+
+          // Ignore if the update was by the same user:
+          if (content.uid === uid)
+            return;
+
+          // Not synced! If this continues for 5 more edits, sync up the client:
+          if (content.text !== document.getElementById("editor").textContent) {
+            contentCheck++;
+
+            if (contentCheck >= contentCheckDelay) {
+
+              let caretPos = getCaretPosition(document.getElementById("editor"));
+
+              document.getElementById("editor").textContent = content.text;
+              setCaretPosition(document.getElementById("editor"), caretPos);
+
+              contentCheck = 0;
+            }
+
+          } else {
+            contentCheck = 0;
+          }
+
+        });
+
+        // Also check periodically:
+        setInterval(async function() {
+
+          let content = await getData("docs/default/content", function(err) { console.error(err); });
+
+          // Ignore if the update is old:
+          if (content.updated >= prevContentUpdated) {
+            prevContentUpdated = content.updated
+          } else {
+            return;
+          }
+
+          // Ignore if the update was by the same user:
+          if (content.uid === uid)
+            return;
+
+          // Not synced! If this continues for 5 more edits, sync up the client:
+          if (content.text !== document.getElementById("editor").textContent) {
+            contentCheck++;
+
+            if (contentCheck >= contentCheckDelay) {
+
+              let caretPos = getCaretPosition(document.getElementById("editor"));
+
+              document.getElementById("editor").textContent = content.text;
+              setCaretPosition(document.getElementById("editor"), caretPos);
+
+              contentCheck = 0;
+            }
+
+          } else {
+            contentCheck = 0;
+          }
+
+        }, 250);
       });
 
       document.getElementById("editor").addEventListener("keydown", async function(e) {
@@ -105,25 +203,98 @@
 
         // Handle enter:
         if (e.keyCode === 13) {
-          // Prevent multiple lines from being added:
-          if (this.textContent[caretPos - 1] === "\n") {
-            e.preventDefault();
-            return;
-          }
           key = "\n";
         }
 
         // Handle backspace / delete:
-        if (e.keyCode === 8 && caretPos > 0 || e.keyCode === 46 && caretPos < this.textContent.length) {
+        if (e.keyCode === 8 && caretPos.end > 0 || e.keyCode === 46 && caretPos.end < this.textContent.length) {
+          // No selection:
+          if (caretPos.start === caretPos.end) {
+            buffer({
+              uid: uid,
+              timestamp: getTime(),
+              action: "delete",
+              contentPre: this.textContent[caretPos.end - (e.keyCode === 8 ? 1 : 0)],
+              index: caretPos.end - (e.keyCode === 8 ? 1 : 0),
+              surrounding: {
+                before: this.textContent[caretPos.end - 1 - (e.keyCode === 8 ? 1 : 0)] || false,
+                after: this.textContent[caretPos.end + (e.keyCode === 46 ? 1 : 0)] || false
+              }
+            });
+
+            lastKeyPress = getTime();
+            attemptToPushChanges(lastKeyPress);
+
+          // Selection:
+          } else {
+            buffer({
+              uid: uid,
+              timestamp: getTime(),
+              action: "replace",
+              contentPre: this.textContent.substring(caretPos.start, caretPos.end),
+              content: "",
+              index: {
+                start: caretPos.start,
+                end: caretPos.end
+              },
+              surrounding: {
+                before: this.textContent[caretPos.start - 1] || false,
+                after: this.textContent[caretPos.end] || false
+              }
+            });
+
+            lastKeyPress = getTime();
+            attemptToPushChanges(lastKeyPress);
+          }
+        }
+
+        // Handle ctrl + backspace and ctrl + delete (it acts as a normal backspace/delete keypress):
+        // Note that ctrl + backspace/delete only acts differently if nothing is selected, hence the first conditional
+        if (caretPos.start === caretPos.end && e.ctrlKey && (e.keyCode === 8 || e.keyCode === 46)) {
+          e.preventDefault();
+
+          // Delete the text:
+          this.textContent = this.textContent.substring(0, caretPos.start - (e.keyCode === 8 ? 1 : 0)) + this.textContent.substring(caretPos.end + (e.keyCode === 46 ? 1 : 0));
+
+          // Set the caret to its new position (but only if element is focused):
+          setCaretPosition(this, {
+            start: caretPos.start - (e.keyCode === 8 ? 1 : 0),
+            end: caretPos.start - (e.keyCode === 8 ? 1 : 0)
+          });
+        }
+
+        if (e.keyCode !== 13 && (e.ctrlKey || e.altKey || e.key.length > 1))
+          return;
+
+        if (caretPos.start === caretPos.end) {
           buffer({
             uid: uid,
             timestamp: getTime(),
-            action: "delete",
-            content: "",
-            index: caretPos - (e.keyCode === 8 ? 1 : 0),
+            action: "type",
+            content: key || e.key,
+            index: caretPos.end,
             surrounding: {
-              before: this.textContent[caretPos - 1 - (e.keyCode === 8 ? 1 : 0)] || false,
-              after: this.textContent[caretPos + (e.keyCode === 46 ? 1 : 0)] || false
+              before: this.textContent[caretPos.end - 1] || false, // The first part of this conditional is to ignore the last "\n" that HTML sometimes autofills (for whatever reason):
+              after: (caretPos.end === this.textContent.length - 1 && this.textContent[caretPos.end] === "\n") ? false : (this.textContent[caretPos.end] || false)
+            }
+          });
+
+          lastKeyPress = getTime();
+          attemptToPushChanges(lastKeyPress);
+        } else {
+          buffer({
+            uid: uid,
+            timestamp: getTime(),
+            action: "replace",
+            contentPre: this.textContent.substring(caretPos.start, caretPos.end),
+            content: key || e.key,
+            index: {
+              start: caretPos.start,
+              end: caretPos.end
+            },
+            surrounding: {
+              before: this.textContent[caretPos.start - 1] || false,
+              after: this.textContent[caretPos.end] || false
             }
           });
 
@@ -131,18 +302,115 @@
           attemptToPushChanges(lastKeyPress);
         }
 
-        if (e.keyCode !== 13 && (e.ctrlKey || e.altKey || e.key.length > 1))
+      });
+
+      document.getElementById("editor").addEventListener("input", function(e) {
+
+        // Prevent recursive calls:
+        if (Math.abs(lastInputTimeStamp - e.timeStamp) <= 1) {
+          return;
+        }
+
+        // Immediately push spelling corrections:
+        if (e.inputType === "insertReplacementText") {
+          lastKeyPress = getTime();
+          attemptToPushChanges(lastKeyPress);
+        }
+
+        // [TODO]: allow undo/redo/inserting text by drop/etc. if only 1 user editing
+        // Prevent undo/redo:
+        if (e.inputType === "historyUndo") {
+          lastInputTimeStamp = e.timeStamp;
+          document.execCommand("redo");
+          return;
+        }
+        if (e.inputType === "historyRedo" || e.inputType === "insertFromDrop") {
+          lastInputTimeStamp = e.timeStamp;
+          document.execCommand("undo");
+          return;
+        }
+
+        // [TODO] push undo/redo changes to firebase if only 1 user editing
+
+      });
+
+      document.getElementById("editor").addEventListener("paste", function(e) {
+
+        let caretPos = getCaretPosition(this);
+
+        // Clean pasted text
+        e.preventDefault();
+        let textToPaste = (e.clipboardData.getData("text/plain")).split("\r\n").join("\n");
+
+        // Push pasted text
+        if (caretPos.start === caretPos.end) {
+          buffer({
+            uid: uid,
+            timestamp: getTime(),
+            action: "insert",
+            content: textToPaste,
+            index: caretPos.end,
+            surrounding: {
+              before: this.textContent[caretPos.end - 1] || false,
+              after: this.textContent[caretPos.end] || false
+            }
+          });
+
+          lastKeyPress = getTime();
+          attemptToPushChanges(lastKeyPress);
+        } else {
+          buffer({
+            uid: uid,
+            timestamp: getTime(),
+            action: "replace",
+            contentPre: this.textContent.substring(caretPos.start, caretPos.end),
+            content: textToPaste,
+            index: {
+              start: caretPos.start,
+              end: caretPos.end
+            },
+            surrounding: {
+              before: this.textContent[caretPos.start - 1] || false,
+              after: this.textContent[caretPos.end] || false
+            }
+          });
+
+          lastKeyPress = getTime();
+          attemptToPushChanges(lastKeyPress);
+        }
+
+        // Insert the text:
+        this.textContent = this.textContent.substring(0, caretPos.start) + textToPaste + this.textContent.substring(caretPos.end);
+
+        // Set the caret to its new position (but only if element is focused):
+        setCaretPosition(this, {
+          start: caretPos.start + textToPaste.length,
+          end: caretPos.start + textToPaste.length
+        });
+
+      });
+
+      document.getElementById("editor").addEventListener("cut", function(e) {
+
+        let caretPos = getCaretPosition(this);
+
+        // Push removed text
+        if (caretPos.start === caretPos.end)
           return;
 
         buffer({
           uid: uid,
           timestamp: getTime(),
-          action: "type",
-          content: key || e.key,
-          index: caretPos,
+          action: "replace",
+          contentPre: this.textContent.substring(caretPos.start, caretPos.end),
+          content: "",
+          index: {
+            start: caretPos.start,
+            end: caretPos.end
+          },
           surrounding: {
-            before: this.textContent[caretPos - 1] || false,
-            after: this.textContent[caretPos] || false
+            before: this.textContent[caretPos.start - 1] || false,
+            after: this.textContent[caretPos.end] || false
           }
         });
 
@@ -163,11 +431,13 @@
           while (pending.length > 0) {
             set(push(child(ref(db), "docs/default/changes")), pending.splice(0, 1)[0]);
           }
-          // [TODO] update this periodically?
-          set(ref(db, "docs/default/content"), {
-            text: document.getElementById("editor").textContent,
-            updated: getTime()
-          });
+          setTimeout(function() {
+            set(ref(db, "docs/default/content"), {
+              text: document.getElementById("editor").textContent,
+              updated: getTime(),
+              uid: uid
+            });
+          }, 0);
         }
 
       }
@@ -182,19 +452,11 @@
           if (applied.indexOf(i) !== -1)
             continue;
 
+          let changeToPush = JSON.parse(JSON.stringify(changesObj[i]));
+          changeToPush.key = i;
+
           // Otherwise, we will apply this change:
-          changes.push({
-            uid: changesObj[i].uid,
-            timestamp: changesObj[i].timestamp,
-            action: changesObj[i].action,
-            content: changesObj[i].content,
-            index: changesObj[i].index,
-            surrounding: {
-              before: changesObj[i].surrounding.before,
-              after: changesObj[i].surrounding.after
-            },
-            key: i
-          });
+          changes.push(changeToPush);
         }
 
         // No changes to be made!
@@ -223,13 +485,11 @@
 
       function applyChange(c) {
 
-        console.log(c);
-
         // Store the caret position and text content of the editor:
         let caretPos = getCaretPosition(document.getElementById("editor"));
         let t = document.getElementById("editor").textContent;
 
-        let reach = 10; // This determines the maximum distance the character can be moved; default is 10
+        let reach = 20; // This determines the maximum distance the character can be moved; default is 20 [TODO]
         let fitScores;
 
         switch(c.action) {
@@ -237,8 +497,19 @@
             // Transform the positions:
             for (let i = 0; i < pending.length; i++) {
               // The pending text comes before the index where the text is to be inserted; therefore, move the text to be inserted over
-              if (pending[i].index <= c.index) {
+              if (pending[i].action === "type" && pending[i].index <= c.index) {
                 c.index++;
+              }
+              if (pending[i].action === "delete" && pending[i].index <= c.index) {
+                c.index--;
+              }
+              if (pending[i].action === "insert" && pending[i].index <= c.index) {
+                c.index += pending[i].content.length;
+              }
+              if (pending[i].action === "replace" && pending[i].index.end <= c.index) {
+                c.index += pending[i].content.length - pending[i].contentPre.length;
+              } else if (pending[i].action === "replace" && pending[i].index.start < c.index) {
+                return; // The text is going to get replaced anyways; return
               }
             }
 
@@ -257,9 +528,9 @@
             };
 
             // Check how good of a fit moving the character before and after within a certain reach would be:
-            for (let i = 0; i < reach; i++) {
-              fitScores.before.scores.push((((c.index - 2 - i >= 0 ? t[c.index - 2 - i] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - 1 - i >= 0 ? t[c.index - 1 - i] : false) === c.surrounding.after) ? 1 : 0));
-              fitScores.after.scores.push((((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + 1 + i < t.length ? t[c.index + 1 + i] : false) === c.surrounding.after) ? 1 : 0));
+            for (let i = 1; i < reach + 1; i++) {
+              fitScores.before.scores.push((((c.index - i - 1 >= 0 ? t[c.index - i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i >= 0 ? t[c.index - i] : false) === c.surrounding.after) ? 1 : 0));
+              fitScores.after.scores.push((((c.index + i - 1 < t.length ? t[c.index + i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.after) ? 1 : 0));
             }
 
             // Determine the ideal scores for moving the text to be inserted before / after:
@@ -282,19 +553,27 @@
             c.index += fitScores.transform;
 
             // The text to be inserted comes before the caret position; therefore, move the caret position over
-            if (caretPos && c.index < caretPos) {
-              caretPos++;
+            if (caretPos && c.index <= caretPos.start) {
+              caretPos.start++;
+            }
+            if (caretPos && c.index < caretPos.end) {
+              caretPos.end++;
             }
             for (let i = 0; i < pending.length; i++) {
               // The text to be inserted comes before the pending text; therefore, move the pending text over
+              if (pending[i].action === "replace") {
+                if (c.index <= pending[i].index.start) {
+                  pending[i].index.start++;
+                  pending[i].index.end++;
+                }
+                continue;
+              }
               if (c.index < pending[i].index) {
                 pending[i].index++;
               }
             }
 
             // Insert the text:
-            if (c.content === " ")
-              c.content = String.fromCharCode(160);
             document.getElementById("editor").textContent = t.substring(0, c.index) + c.content + t.substring(c.index);
 
             // Set the caret to its new position (but only if element is focused):
@@ -305,8 +584,19 @@
             // Transform the positions:
             for (let i = 0; i < pending.length; i++) {
               // The pending text comes before the index where the text is to be removed; therefore, move the text to be inserted over
-              if (pending[i].index <= c.index) {
+              if (pending[i].action === "type" && pending[i].index <= c.index) {
                 c.index++;
+              }
+              if (pending[i].action === "delete" && pending[i].index <= c.index) {
+                c.index--;
+              }
+              if (pending[i].action === "insert" && pending[i].index <= c.index) {
+                c.index += pending[i].content.length;
+              }
+              if (pending[i].action === "replace" && pending[i].index.end <= c.index) {
+                c.index += pending[i].content.length - pending[i].contentPre.length;
+              } else if (pending[i].action === "replace" && pending[i].index.start < c.index) {
+                return; // The text is going to get replaced anyways; return
               }
             }
 
@@ -315,8 +605,8 @@
               before: {
                 scores: [],
                 max: -1
-              },
-              at: (((c.index - 1 >= 0 ? t[c.index - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + 1 < t.length ? t[c.index + 1] : false) === c.surrounding.after) ? 1 : 0),
+              }, // Check the character before, at, and after the 0 index; score the "at" position based on that. This process will be repeated in the for loop down below.
+              at: (((c.index - 1 >= 0 ? t[c.index - 1] : false) === c.surrounding.before) ? 1 : 0) + ((t[c.index] === c.contentPre) ? 3 : 0) + (((c.index + 1 < t.length ? t[c.index + 1] : false) === c.surrounding.after) ? 1 : 0),
               after: {
                 scores: [],
                 max: -1
@@ -325,9 +615,9 @@
             };
 
             // Check how good of a fit removing the character before and after within a certain reach would be:
-            for (let i = 0; i < reach; i++) {
-              fitScores.before.scores.push((((c.index - 2 - i >= 0 ? t[c.index - 2 - i] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i < t.length ? t[c.index - i] : false) === c.surrounding.after) ? 1 : 0));
-              fitScores.after.scores.push((((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + 2 + i < t.length ? t[c.index + 2 + i] : false) === c.surrounding.after) ? 1 : 0));
+            for (let i = 1; i < reach + 1; i++) {
+              fitScores.before.scores.push((((c.index - i - 1 >= 0 ? t[c.index - i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i > 0 ? t[c.index - i] : false) === c.contentPre) ? 3 : 0) + (((c.index - i + 1 < t.length ? t[c.index - i + 1] : false) === c.surrounding.after) ? 1 : 0));
+              fitScores.after.scores.push((((c.index + i - 1 < t.length ? t[c.index + i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + i < t.length ? t[c.index + i] : false) === c.contentPre) ? 3 : 0) + (((c.index + i + 1 < t.length ? t[c.index + i + 1] : false) === c.surrounding.after) ? 1 : 0));
             }
 
             // Determine the ideal scores for moving the text to be removed before / after:
@@ -335,7 +625,7 @@
             fitScores.after.max = Math.max(...fitScores.after.scores);
 
             // Get the transform (if moving the character achieves a higher score than where it is currently placed):
-            if (fitScores.at !== 2 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
+            if (fitScores.at !== 5 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
               // If it's better to remove the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be removed):
               if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
                 fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
@@ -350,11 +640,21 @@
             c.index += fitScores.transform;
 
             // The text to be removed comes before the caret position; therefore, move the caret position over
-            if (caretPos && c.index < caretPos) {
-              caretPos--;
+            if (caretPos && c.index < caretPos.start) {
+              caretPos.start--;
+            }
+            if (caretPos && c.index < caretPos.end) {
+              caretPos.end--;
             }
             for (let i = 0; i < pending.length; i++) {
               // The text to be removed comes before the pending text; therefore, move the pending text over
+              if (pending[i].action === "replace") {
+                if (c.index <= pending[i].index.start) {
+                  pending[i].index.start--;
+                  pending[i].index.end--;
+                }
+                continue;
+              }
               if (c.index < pending[i].index) {
                 pending[i].index--;
               }
@@ -362,6 +662,194 @@
 
             // Remove the text:
             document.getElementById("editor").textContent = t.substring(0, c.index) + t.substring(c.index + 1);
+
+            // Set the caret to its new position (but only if element is focused):
+            if (caretPos)
+              setCaretPosition(document.getElementById("editor"), caretPos);
+          break;
+          case "insert":
+            // Transform the positions:
+            for (let i = 0; i < pending.length; i++) {
+              // The pending text comes before the index where the text is to be inserted; therefore, move the text to be inserted over
+              if (pending[i].action === "type" && pending[i].index <= c.index) {
+                c.index++;
+              }
+              if (pending[i].action === "delete" && pending[i].index <= c.index) {
+                c.index--;
+              }
+              if (pending[i].action === "insert" && pending[i].index <= c.index) {
+                c.index += pending[i].content.length;
+              }
+              if (pending[i].action === "replace" && pending[i].index.end <= c.index) {
+                c.index += pending[i].content.length - pending[i].contentPre.length;
+              } else if (pending[i].action === "replace" && pending[i].index.start < c.index) {
+                return;  // The text is going to get replaced anyways; return
+              }
+            }
+
+            // Check if the text to be inserted fits here or not:
+            fitScores = {
+              before: {
+                scores: [],
+                max: -1
+              },
+              at: (((c.index - 1 >= 0 ? t[c.index - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index < t.length ? t[c.index] : false) === c.surrounding.after) ? 1 : 0),
+              after: {
+                scores: [],
+                max: -1
+              },
+              transform: 0
+            };
+
+            // Check how good of a fit moving the character before and after within a certain reach would be:
+            for (let i = 1; i < reach + 1; i++) {
+              fitScores.before.scores.push((((c.index - i - 1 >= 0 ? t[c.index - i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i >= 0 ? t[c.index - i] : false) === c.surrounding.after) ? 1 : 0));
+              fitScores.after.scores.push((((c.index + i - 1 < t.length ? t[c.index + i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.after) ? 1 : 0));
+            }
+
+            // Determine the ideal scores for moving the text to be inserted before / after:
+            fitScores.before.max = Math.max(...fitScores.before.scores);
+            fitScores.after.max = Math.max(...fitScores.after.scores);
+
+            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
+            if (fitScores.at !== 2 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
+              // If it's better to place the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be placed):
+              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
+                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
+
+              // If it's better to place the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
+              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
+                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
+
+            }
+
+            // Move the character accordingly:
+            c.index += fitScores.transform;
+
+            // The text to be inserted comes before the caret position; therefore, move the caret position over
+            if (caretPos && c.index <= caretPos.start) {
+              caretPos.start += c.content.length;
+            }
+            if (caretPos && c.index < caretPos.end) {
+              caretPos.end += c.content.length;
+            }
+            for (let i = 0; i < pending.length; i++) {
+              // The text to be inserted comes before the pending text; therefore, move the pending text over
+              if (pending[i].action === "replace") {
+                if (c.index <= pending[i].index.start) {
+                  pending[i].index.start += c.content.length;
+                  pending[i].index.end += c.content.length;
+                }
+                continue;
+              }
+              if (c.index < pending[i].index) {
+                pending[i].index += c.content.length;
+              }
+            }
+
+            // Insert the text:
+            document.getElementById("editor").textContent = t.substring(0, c.index) + c.content + t.substring(c.index);
+
+            // Set the caret to its new position (but only if element is focused):
+            if (caretPos)
+              setCaretPosition(document.getElementById("editor"), caretPos);
+          break;
+          case "replace":
+            // Transform the positions:
+            for (let i = 0; i < pending.length; i++) {
+              // The pending text comes before the index where the text is to be replaced; therefore, move the text to be inserted over
+              if (pending[i].action === "type" && pending[i].index <= c.index.start) {
+                c.index.start++;
+              }
+              if (pending[i].action === "type" && pending[i].index <= c.index.end) {
+                c.index.end++;
+              }
+              if (pending[i].action === "delete" && pending[i].index <= c.index.start) {
+                c.index.start--;
+              }
+              if (pending[i].action === "delete" && pending[i].index <= c.index.end) {
+                c.index.end--;
+              }
+              if (pending[i].action === "insert" && pending[i].index <= c.index.start) {
+                c.index.start += pending[i].content.length;
+              }
+              if (pending[i].action === "insert" && pending[i].index <= c.index.end) {
+                c.index.end += pending[i].content.length;
+              }
+              // Replacing could be implemented here, but it's quite the hassle
+            }
+
+            // Check if the text to be removed fits here or not:
+            fitScores = {
+              before: {
+                scores: [],
+                max: -1
+              }, // Check the character before, at, and after the 0 index; score the "at" position based on that. This process will be repeated in the for loop down below.
+              at: (((c.index.start - 1 >= 0 ? t[c.index.start - 1] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start, c.index.end) === c.contentPre) ? 3 : 0) + (((c.index.end < t.length ? t[c.index.end] : false) === c.surrounding.after) ? 1 : 0),
+              after: {
+                scores: [],
+                max: -1
+              },
+              transform: 0
+            };
+
+            // Check how good of a fit removing the character before and after within a certain reach would be:
+            for (let i = 1; i < reach + 1; i++) {
+              fitScores.before.scores.push((((c.index.start - 1 - i >= 0 ? t[c.index.start - 1 - i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start - i, c.index.end - i) === c.contentPre) ? 3 : 0) + (((c.index.end - i < t.length ? t[c.index.end - i] : false) === c.surrounding.after) ? 1 : 0));
+              fitScores.after.scores.push((((c.index.start - 1 + i < t.length ? t[c.index.start - 1 + i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start + i, c.index.end + i) === c.contentPre) ? 3 : 0) + (((c.index.end + i < t.length ? t[c.index.end + i] : false) === c.surrounding.after) ? 1 : 0));
+            }
+
+            // Determine the ideal scores for moving the text to be removed before / after:
+            fitScores.before.max = Math.max(...fitScores.before.scores);
+            fitScores.after.max = Math.max(...fitScores.after.scores);
+
+            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
+            if (fitScores.at !== 5 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
+              // If it's better to remove the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be removed):
+              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
+                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
+
+              // If it's better to remove the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
+              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
+                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
+
+            }
+
+            // Move the removal accordingly:
+            c.index.start += fitScores.transform;
+            c.index.end += fitScores.transform;
+
+            // Deal with the caret positions:
+            // Note that "[ ]" represents the text being replaced; "I I" represents the current selection
+            if (caretPos && c.index.start < caretPos.start && c.index.end <= caretPos.start) {
+              // Text being replaced is entirely before the current selection
+              // [ ] I I
+              caretPos.start += c.content.length - c.contentPre.length;
+              caretPos.end += c.content.length - c.contentPre.length;
+            } else if (caretPos && c.index.start <= caretPos.start && c.index.end > caretPos.start && c.index.end < caretPos.end) {
+              // Text being replaced overlaps the start of the current selection
+              // [ I ] I
+              caretPos.start = c.index.start + c.content.length;
+              caretPos.end += c.content.length - c.contentPre.length;
+            } else if (caretPos && c.index.start > caretPos.start && c.index.start < caretPos.end && c.index.end >= caretPos.end) {
+              // Text being replaced overlaps the end of the current selection
+              // I [ I ]
+              caretPos.end = c.index.start;
+            } else if (caretPos && c.index.start > caretPos.start && c.index.end < caretPos.end) {
+              // Text being replaced is entirely contained within the current selection
+              // I [ ] I
+              caretPos.end += c.content.length - c.contentPre.length;
+            } else if (caretPos && c.index.start <= caretPos.start && c.index.end >= caretPos.end) {
+              // Text being replaced is entirely surrounding the current selection
+              // [ I I ]
+              caretPos.start = c.index.start;
+              caretPos.end = c.index.start;
+            }
+
+            // Dealing with pending text could be implemented here, but it's a hassle
+
+            // Remove the text:
+            document.getElementById("editor").textContent = t.substring(0, c.index.start) + c.content + t.substring(c.index.end);
 
             // Set the caret to its new position (but only if element is focused):
             if (caretPos)
@@ -394,29 +882,46 @@
 
       function getCaretPosition(el) {
 
+        // If no element is focused, return:
         if (el !== document.activeElement)
           return false;
 
+        // Get the current range:
         let range = window.getSelection().getRangeAt(0);
-        let preCaretRange = range.cloneRange();
-        preCaretRange.selectNodeContents(el);
-        preCaretRange.setEnd(range.endContainer, range.endOffset);
 
-        return preCaretRange.toString().length;
+        // Find the starting position of the range:
+        let caretRangeStart = range.cloneRange();
+        caretRangeStart.selectNodeContents(el);
+        caretRangeStart.setEnd(range.startContainer, range.startOffset);
+
+        // Find the ending position of the range:
+        let caretRangeEnd = range.cloneRange();
+        caretRangeEnd.selectNodeContents(el);
+        caretRangeEnd.setEnd(range.endContainer, range.endOffset);
+
+        // Return the position data:
+        return {
+          start: caretRangeStart.toString().length,
+          end: caretRangeEnd.toString().length
+        };
 
       }
 
       function setCaretPosition(el, pos) {
 
+        // If no element is focused, return:
         if (!el.childNodes[0])
           return;
 
+        // Create a new selection range:
         let range = document.createRange();
         let sel = window.getSelection();
 
-        range.setStart(el.childNodes[0], pos);
-        range.collapse(true);
+        // Set the start and end of the selection range:
+        range.setStart(el.childNodes[0], Math.min(pos.start, el.textContent.length));
+        range.setEnd(el.childNodes[0], Math.min(pos.end, el.textContent.length));
 
+        // Apple the selection range:
         sel.removeAllRanges();
         sel.addRange(range);
 
