@@ -7,8 +7,8 @@ Note that you should use different UIDs if testing it on multiple devices. In an
 
 All code is free to use.
 
-Currently, it only supports entering and deleting text (at any position), but I plan to add support for selections, cutting/pasting, cursor/active user display, and more.
+Currently, ~~it only supports entering and deleting text (at any position), but I plan to add support for selections, cutting/pasting, cursor/active user display, and more.~~ it now supports typing, deletions, selections and cutting/pasting! Cursor display and rich formatting coming soon :)
 
-Also of note: the program will (rarely, but it still happens occasionally) get out of sync. The way to fix this is quite simple: just pull the most up-to-date-content once the input field is blurred and pending changes have been pushed (since the content is no longer being edited by the user, meaning we don't care about the cursor position).
+~~Also of note: the program will (rarely, but it still happens occasionally) get out of sync. The way to fix this is quite simple: just pull the most up-to-date-content once the input field is blurred and pending changes have been pushed (since the content is no longer being edited by the user, meaning we don't care about the cursor position).~~ This has been fixed.
 
-I would also like to get line breaks working, but they're quite finicky in HTML for some reason [UPDATE: THEY WORK NOW!]. Doing something similar to what I did with spaces (change them to Unicode character 160, a non-breaking space) might work. Another way to get line breaks working would be to create a new document for each new-line entered, which does work, but is less user-friendly.
+~~I would also like to get line breaks working, but they're quite finicky in HTML for some reason [UPDATE: THEY WORK NOW!]. Doing something similar to what I did with spaces (change them to Unicode character 160, a non-breaking space) might work. Another way to get line breaks working would be to create a new document for each new-line entered, which does work, but is less user-friendly.~~ This has been fixed!
