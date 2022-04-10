@@ -19,6 +19,7 @@
         padding: 50px;
         width: 60vw;
         height: 50vh;
+        overflow-y: auto;
         box-shadow: 0px 0px 10px rgb(225, 225, 225);
         border-radius: 20px;
         font-size: 1.2rem;
@@ -32,9 +33,44 @@
         outline: none;
         box-shadow: 0px 0px 10px rgb(200, 200, 200);
       }
+
+      .buttons {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+        border-radius: 20px;
+        box-shadow: 0px 0px 10px rgb(225, 225, 225);
+        padding: 10px 5px;
+      }
+      .button {
+        width: 50px;
+        height: 50px;
+        line-height: 50px;
+        border-radius: 10px;
+        box-shadow: 0px 0px 10px rgb(225, 225, 225);
+        font-size: 1.5rem;
+        font-family: Helvetica;
+        transition: box-shadow 0.25s;
+        margin: 0px 5px;
+        text-align: center;
+      }
+      .button:hover {
+        cursor: pointer;
+        box-shadow: 0px 0px 10px rgb(200, 200, 200);
+      }
+      .bold {
+        font-weight: bold;
+      }
+      .italic {
+        font-style: italic;
+      }
+      .underline {
+        text-decoration: underline;
+      }
     </style>
   </head>
   <body>
+    <div class="buttons"><div class="button bold" id="bold">B</div><div class="button italic" id="italic">I</div><div class="button underline" id="underline">U</div></div>
     <div id="editor" contenteditable="plaintext-only"></div>
     <script type="module">
 
@@ -54,35 +90,41 @@
 
         [TODO]: sync in the background when not focused (ignore changes, basically)
         [DONE!!]: periodically check sync(?)
-        [TODO IMPORTANT] ==> remove old "changes" ( > 10 mins old (?))
+        [DONE!! IMPORTANT] ==> remove old "changes" ( > 10 mins old (?)) [remove them if all users have updated to them; check the lastUpdated timestamp in user data and if all are > timestamp for change, delete it]
 
         [TODO]: display cursor positions + selections => USE SPANS!!!
 
-        [TODO]: bold, italics, underlining, strikethrough, links
+        [DONE!!]: bold, italics, underlining
+        [TODO]: strikethrough, links
 
         [DONE!!]: \n sometimes changes to \r (???? might've been bc i was screwing around with cursor stuff... might not be an issue but still test anyway)
-        [TODO]: sometimes when one person is typing and the other is typing / deletes, their cursor will jump to the start of the doc which is kinda annoying
-        [TODO]: if text is selected (ctrl + a) and end of selection is end of doc, and someone types something, keep end of selection at end of doc
+        [DONE!! (MIGHT BE FIXED??)]: sometimes when one person is typing and the other is typing / deletes, their cursor will jump to the start of the doc which is kinda annoying
+        [DONE!!]: if text is selected (ctrl + a) and end of selection is end of doc, and someone types something, keep end of selection at end of doc
         [DONE!!]: handle ctrl + x
         [DONE!!]: disable ctrl + delete
         [TODO (MAYBE??)] implement custom ctrl + delete (replace until previous space with "" [nothing] - note that if character immediately before cursor is a space, that space should be ignored and deleted as well as the rest of the text content, like normal ctrl + delete)
-        [TODO]: enters at bottom of doc don't show up until after syncing (sometimes) + sometimes things show up on the wrong bottom line (oof)
+        [DONE!!]: enters at bottom of doc don't show up until after syncing (sometimes) + sometimes things show up on the wrong bottom line (oof)
         [DONE!!]: pasting in content with line breaks does not work properly (yikes)
 
-        [TODO] before and after checking should stop at index -1 (or -2 idk) or at the end of the text content; otherwise, you might get false positives which is not ideal
+        [DONE!!] before and after checking should stop at index -1 (or -2 idk) or at the end of the text content; otherwise, you might get false positives which is not ideal
 
         [TODO (SOMEWHAT DONE!!)]: HANDLE dragging + dropping text??? [TODO]: allow when only 1 person editing
         [TODO (SOMEWHAT DONE!!)] HANDLE CTRL + Z (should be disabled if multiple editors at same time; or immediate sync(?) assuming client is up-to-date) [TODO]: allow when only 1 person editing
 
         [TODO] TO TEST: try out multiple docs!! the code should be setup for it already, just need to change depending on what div is focused :)
 
+        [TODO] replacing formatted text should copy that text's formatting (first char? idk check what docs does)
+        [TODO] clicking "bold" or "italic" or "underline" should store those values in some variable + apply styles when key is pressed; wipe if arrow key or mouse is clicked
+        [TODO] ctrl + b should bold, ctrl + i should italic, etc.
+        [DONE!!] send style updates to firebase
+        [DONE!!] store styling in firebase somewhere
       */
 
       // [DONE!!] handle errors when not focused on anything and a change is sent
 
       // Import the needed functions from the SDKs
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-app.js";
-      import { getDatabase, set, get, ref, query, onValue, child, push, remove } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
+      import { getDatabase, set, get, ref, query, onValue, child, push, remove, onDisconnect } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
 
       // Your web app's Firebase configuration
       const firebaseConfig = {
@@ -100,7 +142,7 @@
 
       let pending = [];
       let applied = [];
-      let uid = prompt("enter uid");
+      let uid = "User" + getTime().toString() + Math.floor(Math.random() * Math.pow(10, 5)).toString();
       let lastKeyPress;
       let prevContentUpdated = 0;
       let contentCheck = 0;
@@ -109,24 +151,42 @@
       let contentCheckDelay = 5; // [TODO]
 
       window.addEventListener("load", async function() {
-        let content = await getData("docs/default/content", function(err) { console.error(err); });
-        document.getElementById("editor").textContent = content.text;
+
+        // If the client disconnects, clear their user data:
+        onDisconnect(ref(db, `users/${uid}`)).remove();
+
+        // Get the stored text for the editor:
+        let content = (await getData("vertexes/editor/content", function(err) { console.error(err); })) || { text: "\n", style: { bold: "", italic: "", underline: "" }, uid: "", updated: 0 };
+        setText(document.getElementById("editor"), content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
+        setStyle(document.getElementById("editor"), content.style);
 
         // Update the "applied" values:
-        let changesObj = await getData("docs/default/changes", function(err) { console.error(err); });
+        let changesObj = await getData("vertexes/editor/changes", function(err) { console.error(err); });
         for (let i in changesObj) {
           applied.push(i);
         }
 
+        // Set the user data:
+        set(ref(db, `users/${uid}`), {
+          status: "active",
+          // vertex: null, [TODO] remove once implemented
+          // cursor: {
+          //   start: null,
+          //   end: null
+          // },
+          changed: new Date().getTime(),
+          updated: new Date().getTime()
+        });
+
         // Get new data coming in:
-        onValue(ref(db, "docs/default/changes"), (snapshot) => {
+        onValue(ref(db, "vertexes/editor/changes"), (snapshot) => {
           const changes = snapshot.val();
           checkForChanges(changes);
         });
 
         // Check to ensure the clients are all synced properly:
-        onValue(ref(db, "docs/default/content"), (snapshot) => {
-          const content = snapshot.val();
+        onValue(ref(db, "vertexes/editor/content"), (snapshot) => {
+          const content = snapshot.val() || { text: "\n", style: { bold: "", italic: "", underline: "" }, uid: "", updated: 0 };
 
           // Ignore if the update is old:
           if (content.updated >= prevContentUpdated) {
@@ -145,9 +205,14 @@
 
             if (contentCheck >= contentCheckDelay) {
 
+              if (getTime() - lastKeyPress <= 1000)
+                return;
+
               let caretPos = getCaretPosition(document.getElementById("editor"));
 
-              document.getElementById("editor").textContent = content.text;
+              document.getElementById("editor").textContent = "";
+              setText(document.getElementById("editor"), content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
+              setStyle(document.getElementById("editor"), content.style);
               setCaretPosition(document.getElementById("editor"), caretPos);
 
               contentCheck = 0;
@@ -159,10 +224,10 @@
 
         });
 
-        // Also check periodically:
+        // Also check syncing periodically:
         setInterval(async function() {
 
-          let content = await getData("docs/default/content", function(err) { console.error(err); });
+          let content = (await getData("vertexes/editor/content", function(err) { console.error(err); })) || { text: "\n", style: { bold: "", italic: "", underline: "" }, uid: "", updated: 0 };
 
           // Ignore if the update is old:
           if (content.updated >= prevContentUpdated) {
@@ -181,9 +246,14 @@
 
             if (contentCheck >= contentCheckDelay) {
 
+              if (getTime() - lastKeyPress <= 1000)
+                return;
+
               let caretPos = getCaretPosition(document.getElementById("editor"));
 
-              document.getElementById("editor").textContent = content.text;
+              document.getElementById("editor").textContent = "";
+              setText(document.getElementById("editor"), content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
+              setStyle(document.getElementById("editor"), content.style);
               setCaretPosition(document.getElementById("editor"), caretPos);
 
               contentCheck = 0;
@@ -193,18 +263,27 @@
             contentCheck = 0;
           }
 
+          // console.log("CC: " + contentCheck);
+
         }, 250);
+
       });
 
       document.getElementById("editor").addEventListener("keydown", async function(e) {
+
+        // Prevent defualt behavior of most keys (alpha-numerical and delete/backspace):
+        // Note that this disables the use of ctrl + backspace/delete; this is done on purpose since its behavior is sometimes hard to predict (especially with special characters)
+        if ((!e.ctrlKey && e.key.length === 1) || (e.keyCode === 8 || e.keyCode === 46 || e.keyCode === 13))
+          e.preventDefault();
 
         let caretPos = getCaretPosition(this);
         let key;
 
         // Handle enter:
-        if (e.keyCode === 13) {
+        if (e.keyCode === 13)
           key = "\n";
-        }
+
+        // console.log("B/T ||| " + (this.textContent[caretPos.end - 1] || false) + " ||| " + (key || e.key));
 
         // Handle backspace / delete:
         if (e.keyCode === 8 && caretPos.end > 0 || e.keyCode === 46 && caretPos.end < this.textContent.length) {
@@ -224,6 +303,8 @@
 
             lastKeyPress = getTime();
             attemptToPushChanges(lastKeyPress);
+
+            setText(this, "", { start: caretPos.end - 1, end: caretPos.end });
 
           // Selection:
           } else {
@@ -245,24 +326,12 @@
 
             lastKeyPress = getTime();
             attemptToPushChanges(lastKeyPress);
+
+            setText(this, "", caretPos);
           }
         }
 
-        // Handle ctrl + backspace and ctrl + delete (it acts as a normal backspace/delete keypress):
-        // Note that ctrl + backspace/delete only acts differently if nothing is selected, hence the first conditional
-        if (caretPos.start === caretPos.end && e.ctrlKey && (e.keyCode === 8 || e.keyCode === 46)) {
-          e.preventDefault();
-
-          // Delete the text:
-          this.textContent = this.textContent.substring(0, caretPos.start - (e.keyCode === 8 ? 1 : 0)) + this.textContent.substring(caretPos.end + (e.keyCode === 46 ? 1 : 0));
-
-          // Set the caret to its new position (but only if element is focused):
-          setCaretPosition(this, {
-            start: caretPos.start - (e.keyCode === 8 ? 1 : 0),
-            end: caretPos.start - (e.keyCode === 8 ? 1 : 0)
-          });
-        }
-
+        // If we aren't dealing with a normal key, return now:
         if (e.keyCode !== 13 && (e.ctrlKey || e.altKey || e.key.length > 1))
           return;
 
@@ -301,6 +370,8 @@
           lastKeyPress = getTime();
           attemptToPushChanges(lastKeyPress);
         }
+
+        setText(this, key || e.key, caretPos);
 
       });
 
@@ -380,13 +451,7 @@
         }
 
         // Insert the text:
-        this.textContent = this.textContent.substring(0, caretPos.start) + textToPaste + this.textContent.substring(caretPos.end);
-
-        // Set the caret to its new position (but only if element is focused):
-        setCaretPosition(this, {
-          start: caretPos.start + textToPaste.length,
-          end: caretPos.start + textToPaste.length
-        });
+        setText(this, textToPaste, caretPos);
 
       });
 
@@ -419,24 +484,155 @@
 
       });
 
+      function setText(el, text, pos, ignoreCursor) {
+
+        // There was a text selection that is being overridden; remove the text being overridden:
+        if (pos.start !== pos.end) {
+          for (let i = pos.end - 1; i >= pos.start; i--) {
+            el.childNodes[i].remove();
+          }
+        }
+
+        // If no text is to be inserted, we're done here:
+        if (text.length === 0)
+          return;
+
+        // If the text to be inserted contains multiple characters, use a recursive call to add them one at a time (in order):
+        if (text.length > 1) {
+          for (let i = 0; i < text.length; i++) {
+            setText(el, text[i], { start: pos.start + i, end: pos.start + i }, true);
+          }
+
+          if (!ignoreCursor)
+            setCaretPosition(el, { start: pos.start + text.length, end: pos.start + text.length });
+
+          return;
+        }
+
+        // Only 1 character is to be added; get the styles and append the element to the editor:
+        let classList = (pos.start - 1 >= 0 && el.childNodes[pos.start - 1].classList.value) ? ` class="${el.childNodes[pos.start - 1].classList.value}"` : "";
+
+        let span = document.createElement("div");
+        span.innerHTML = `<span${classList}>${text}</span>`;
+        if (pos === el.textContent.length) {
+          el.appendChild(span.childNodes[0]);
+        } else {
+          el.insertBefore(span.childNodes[0], el.childNodes[pos.start]);
+        }
+
+        // Set the caret position (if requested):
+        if (!ignoreCursor)
+          setCaretPosition(el, { start: pos.start + 1, end: pos.start + 1 });
+
+      }
+
+      document.getElementById("bold").addEventListener("mousedown", function(e) {
+        e.preventDefault();
+        applyStyle(document.getElementById("editor"), "bold");
+      });
+      document.getElementById("italic").addEventListener("mousedown", function(e) {
+        e.preventDefault();
+        applyStyle(document.getElementById("editor"), "italic");
+      });
+      document.getElementById("underline").addEventListener("mousedown", function(e) {
+        e.preventDefault();
+        applyStyle(document.getElementById("editor"), "underline");
+      });
+
+      function setStyle(el, styles) {
+
+        for (let style in styles) {
+          for (let i = 0; i < styles[style].length; i++) {
+            if (styles[style][i] === "X") {
+              applyStyle(el, style, { start: i, end: i + 1 }, true);
+            }
+          }
+        }
+      }
+
+      function applyStyle(el, style, pos, addStyle) {
+
+        let spans = el.childNodes;
+        let localChange = pos ? false : true;
+
+        // Get current caret position:
+        if (!pos)
+          pos = getCaretPosition(el);
+
+        // Check if style needs to be added or removed:
+        if (addStyle === undefined) {
+          addStyle = false;
+
+          for (let i = pos.start; i < pos.end; i++) {
+            if (!spans[i].classList.contains(style)) {
+              addStyle = true;
+              break;
+            }
+          }
+        }
+
+        // If no pos is passed in, assume that this was a local change
+        if (localChange) {
+
+          // Push changes:
+          buffer({
+            uid: uid,
+            timestamp: getTime(),
+            action: "style",
+            contentPre: el.textContent.substring(pos.start, pos.end),
+            content: (addStyle ? "" : "-") + style,
+            index: {
+              start: pos.start,
+              end: pos.end
+            },
+            surrounding: {
+              before: el.textContent[pos.start - 1] || false,
+              after: el.textContent[pos.end] || false
+            }
+          });
+
+          lastKeyPress = getTime();
+          attemptToPushChanges(lastKeyPress);
+        }
+
+        // Apply style:
+        for (let i = pos.start; i < pos.end; i++) {
+          if (addStyle && !spans[i].classList.contains(style)) {
+            spans[i].classList.add(style);
+          } else if (!addStyle) {
+            spans[i].classList.remove(style);
+          }
+        }
+      }
+
       async function attemptToPushChanges(t) {
 
         // Check for changes on the server side:
-        let changesObj = await getData("docs/default/changes", function(err) { console.error(err); });
+        let changesObj = await getData("vertexes/editor/changes", function(err) { console.error(err); });
 
         // This will check for changes and apply them if found; otherwise, the function will return false
         if (!checkForChanges(changesObj, t)) {
 
           // No changes to handle; push pending changes
           while (pending.length > 0) {
-            set(push(child(ref(db), "docs/default/changes")), pending.splice(0, 1)[0]);
+            set(push(child(ref(db), "vertexes/editor/changes")), pending.splice(0, 1)[0]);
           }
+
+          // Update the stored content and the user changed time:
           setTimeout(function() {
-            set(ref(db, "docs/default/content"), {
-              text: document.getElementById("editor").textContent,
+            set(ref(db, "vertexes/editor/content"), {
+              text: document.getElementById("editor").textContent + (document.getElementById("editor").textContent[document.getElementById("editor").textContent.length - 1] !== "\n" ? "\n" : ""),
+              style: {
+                bold: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join(""),
+                italic: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join(""),
+                underline: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join("")
+              },
               updated: getTime(),
               uid: uid
             });
+          }, 0);
+          setTimeout(function() {
+            set(ref(db, `users/${uid}/changed`), getTime());
           }, 0);
         }
 
@@ -474,6 +670,39 @@
           applied.push(changes[i].key);
         }
 
+        // After changes have been applied, update content and last updated date:
+        setTimeout(function() {
+          set(ref(db, "vertexes/editor/content"), {
+            text: document.getElementById("editor").textContent + (document.getElementById("editor").textContent[document.getElementById("editor").textContent.length - 1] !== "\n" ? "\n" : ""),
+            style: {
+              bold: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join(""),
+              italic: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join(""),
+              underline: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join("")
+            },
+            updated: getTime(),
+            uid: uid
+          });
+        }, 0);
+        setTimeout(async function() {
+          await set(ref(db, `users/${uid}/updated`), changes[changes.length - 1].timestamp);
+
+          let users = await getData("users", function(err) { console.error(err); });
+          let allChanges = await getData("vertexes/editor/changes", function(err) { console.error(err); });
+
+          let allUpdated;
+          for (let change in allChanges) {
+            allUpdated = true;
+            for (let i in users) {
+              if (users[i].updated < allChanges[change].timestamp) {
+                allUpdated = false;
+                break;
+              }
+            }
+            if (allUpdated)
+              remove(ref(db, `vertexes/editor/changes/${change}`));
+          }
+        }, 0);
+
         // If no pending changes have been made since the last keypress, try again
         if (t && t === lastKeyPress) {
           attemptToPushChanges();
@@ -485,9 +714,15 @@
 
       function applyChange(c) {
 
+        // console.log("CHANGE");
+        // console.log(c);
+
         // Store the caret position and text content of the editor:
         let caretPos = getCaretPosition(document.getElementById("editor"));
         let t = document.getElementById("editor").textContent;
+
+        // Remove the "\n" that is always present, but not actually able to be edited:
+        t = (t[t.length - 1] === "\n") ? (t.substring(0, t.length - 1)) : t;
 
         let reach = 20; // This determines the maximum distance the character can be moved; default is 20 [TODO]
         let fitScores;
@@ -513,6 +748,8 @@
               }
             }
 
+            // console.log(t);
+
             // Check if the text to be inserted fits here or not:
             fitScores = {
               before: {
@@ -529,8 +766,16 @@
 
             // Check how good of a fit moving the character before and after within a certain reach would be:
             for (let i = 1; i < reach + 1; i++) {
-              fitScores.before.scores.push((((c.index - i - 1 >= 0 ? t[c.index - i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i >= 0 ? t[c.index - i] : false) === c.surrounding.after) ? 1 : 0));
-              fitScores.after.scores.push((((c.index + i - 1 < t.length ? t[c.index + i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.after) ? 1 : 0));
+              if (c.index - i >= 0) {
+                fitScores.before.scores.push((((c.index - i - 1 >= 0 ? t[c.index - i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i >= 0 ? t[c.index - i] : false) === c.surrounding.after) ? 1 : 0));
+              } else {
+                fitScores.before.scores.push(0);
+              }
+              if (c.index + i <= t.length) {
+                fitScores.after.scores.push((((c.index + i - 1 < t.length ? t[c.index + i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.after) ? 1 : 0));
+              } else {
+                fitScores.after.scores.push(0);
+              }
             }
 
             // Determine the ideal scores for moving the text to be inserted before / after:
@@ -548,6 +793,11 @@
                 fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
 
             }
+
+            // console.log("FS");
+            // console.log(fitScores);
+
+            // [TODO] check that deletions + everything else works
 
             // Move the character accordingly:
             c.index += fitScores.transform;
@@ -574,11 +824,11 @@
             }
 
             // Insert the text:
-            document.getElementById("editor").textContent = t.substring(0, c.index) + c.content + t.substring(c.index);
+            setText(document.getElementById("editor"), c.content, { start: c.index, end: c.index }, true);
 
             // Set the caret to its new position (but only if element is focused):
-            if (caretPos)
-              setCaretPosition(document.getElementById("editor"), caretPos);
+            // if (caretPos)
+            //   setCaretPosition(document.getElementById("editor"), caretPos);
           break;
           case "delete":
             // Transform the positions:
@@ -661,11 +911,11 @@
             }
 
             // Remove the text:
-            document.getElementById("editor").textContent = t.substring(0, c.index) + t.substring(c.index + 1);
+            setText(document.getElementById("editor"), "", { start: c.index, end: c.index + 1 }, true);
 
             // Set the caret to its new position (but only if element is focused):
-            if (caretPos)
-              setCaretPosition(document.getElementById("editor"), caretPos);
+            // if (caretPos)
+            //   setCaretPosition(document.getElementById("editor"), caretPos);
           break;
           case "insert":
             // Transform the positions:
@@ -748,11 +998,11 @@
             }
 
             // Insert the text:
-            document.getElementById("editor").textContent = t.substring(0, c.index) + c.content + t.substring(c.index);
+            setText(document.getElementById("editor"), c.content, { start: c.index, end: c.index }, true);
 
             // Set the caret to its new position (but only if element is focused):
-            if (caretPos)
-              setCaretPosition(document.getElementById("editor"), caretPos);
+            // if (caretPos)
+            //   setCaretPosition(document.getElementById("editor"), caretPos);
           break;
           case "replace":
             // Transform the positions:
@@ -849,11 +1099,85 @@
             // Dealing with pending text could be implemented here, but it's a hassle
 
             // Remove the text:
-            document.getElementById("editor").textContent = t.substring(0, c.index.start) + c.content + t.substring(c.index.end);
+            setText(document.getElementById("editor"), c.content, { start: c.index.start, end: c.index.end }, true);
 
             // Set the caret to its new position (but only if element is focused):
-            if (caretPos)
-              setCaretPosition(document.getElementById("editor"), caretPos);
+            // if (caretPos)
+            //   setCaretPosition(document.getElementById("editor"), caretPos);
+          break;
+          case "style":
+            // Transform the positions:
+            for (let i = 0; i < pending.length; i++) {
+              // The pending text comes before the index where the text is to be replaced; therefore, move the style to be inserted over
+              if (pending[i].action === "type" && pending[i].index <= c.index.start) {
+                c.index.start++;
+              }
+              if (pending[i].action === "type" && pending[i].index <= c.index.end) {
+                c.index.end++;
+              }
+              if (pending[i].action === "delete" && pending[i].index <= c.index.start) {
+                c.index.start--;
+              }
+              if (pending[i].action === "delete" && pending[i].index <= c.index.end) {
+                c.index.end--;
+              }
+              if (pending[i].action === "insert" && pending[i].index <= c.index.start) {
+                c.index.start += pending[i].content.length;
+              }
+              if (pending[i].action === "insert" && pending[i].index <= c.index.end) {
+                c.index.end += pending[i].content.length;
+              }
+              // Replacing could be implemented here, but it's quite the hassle
+            }
+
+            // Check if the text to be styled fits here or not:
+            fitScores = {
+              before: {
+                scores: [],
+                max: -1
+              }, // Check the character before, at, and after the 0 index; score the "at" position based on that. This process will be repeated in the for loop down below.
+              at: (((c.index.start - 1 >= 0 ? t[c.index.start - 1] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start, c.index.end) === c.contentPre) ? 3 : 0) + (((c.index.end < t.length ? t[c.index.end] : false) === c.surrounding.after) ? 1 : 0),
+              after: {
+                scores: [],
+                max: -1
+              },
+              transform: 0
+            };
+
+            // Check how good of a fit styling the character before and after within a certain reach would be:
+            for (let i = 1; i < reach + 1; i++) {
+              fitScores.before.scores.push((((c.index.start - 1 - i >= 0 ? t[c.index.start - 1 - i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start - i, c.index.end - i) === c.contentPre) ? 3 : 0) + (((c.index.end - i < t.length ? t[c.index.end - i] : false) === c.surrounding.after) ? 1 : 0));
+              fitScores.after.scores.push((((c.index.start - 1 + i < t.length ? t[c.index.start - 1 + i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start + i, c.index.end + i) === c.contentPre) ? 3 : 0) + (((c.index.end + i < t.length ? t[c.index.end + i] : false) === c.surrounding.after) ? 1 : 0));
+            }
+
+            // Determine the ideal scores for moving the text to be styled before / after:
+            fitScores.before.max = Math.max(...fitScores.before.scores);
+            fitScores.after.max = Math.max(...fitScores.after.scores);
+
+            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
+            if (fitScores.at !== 5 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
+              // If it's better to remove the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be removed):
+              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
+                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
+
+              // If it's better to remove the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
+              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
+                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
+
+            }
+
+            // Move the styling accordingly:
+            c.index.start += fitScores.transform;
+            c.index.end += fitScores.transform;
+
+            // Style the text:
+            let addStyle = c.content.substring(0, 1) === "-" ? false : true;
+            let style = addStyle ? c.content : c.content.substring(1);
+            applyStyle(document.getElementById("editor"), style, { start: c.index.start, end: c.index.end }, addStyle);
+
+            // Set the caret to its new position (but only if element is focused):
+            // if (caretPos)
+            //   setCaretPosition(document.getElementById("editor"), caretPos);
           break;
         }
       }
@@ -918,8 +1242,8 @@
         let sel = window.getSelection();
 
         // Set the start and end of the selection range:
-        range.setStart(el.childNodes[0], Math.min(pos.start, el.textContent.length));
-        range.setEnd(el.childNodes[0], Math.min(pos.end, el.textContent.length));
+        range.setStart(el.childNodes[Math.min(pos.start, el.textContent.length - 1)], pos.start === el.textContent.length ? 1 : 0);
+        range.setEnd(el.childNodes[Math.min(pos.end, el.textContent.length - 1)], pos.end === el.textContent.length ? 1 : 0);
 
         // Apple the selection range:
         sel.removeAllRanges();
@@ -928,7 +1252,22 @@
       }
 
       function getTime() {
-        return (new Date().getTime() - new Date().getTimezoneOffset() * 60 * 1000);
+        return Date.now();
+      }
+
+      function stringToColor(str) {
+
+        // Start t on 1:
+        let t = 1;
+        for (let i = 0; i < str.length; i++) {
+          // Vary t based on the contents of the string so each string is (mostly) unique:
+          t += 1;
+          t *= str.charCodeAt(i);
+          t %= 16777216;
+        }
+
+        // Return the color (pad with 4's if not long enough):
+        return `#${t.toString(16).padStart(6, "4")}`;
       }
 
       function partition(arr, lo, hi, by) {
