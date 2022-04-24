@@ -10,12 +10,13 @@ The editor supports:
  - Typing / Deleting (even while selecting text)
  - Cutting / Pasting
  - Line Breaks
- - Adding Styles (including bold, italics, and underlines)
+ - Adding Styles (including bold, italic, underline, and strikethrough)
  - Smart Syncing (clients will almost always be viewing the exact same text)
+ - Links
+ - Custom Undo/Redo Stack
+ - Activity Status
 
 Coming Soon:
- - Support for Links (and potentially strikethrough)
  - Realtime Cursors
- - Activity Status
- - Background Syncing
- - Extra Single-User Features (such as undo/redo, etc.)
+ - Ctrl + Backspace/Delete Support
+ - Full Support for Multiple Vertexes (text fields)
