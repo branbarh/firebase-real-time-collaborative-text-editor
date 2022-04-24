@@ -4,6 +4,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Realtime Editor Testing</title>
     <style>
+
+      *::selection, .selected {
+        background-color: rgb(180, 225, 255);
+      }
       body {
         display: flex;
         flex-direction: column;
@@ -18,7 +22,7 @@
         display: inline-block;
         padding: 50px;
         width: 60vw;
-        height: 50vh;
+        height: 40vh;
         overflow-y: auto;
         box-shadow: 0px 0px 10px rgb(225, 225, 225);
         border-radius: 20px;
@@ -67,11 +71,68 @@
       .underline {
         text-decoration: underline;
       }
+      .strikethrough {
+        text-decoration: line-through;
+      }
+      .underline.strikethrough {
+        text-decoration: underline line-through;
+      }
+      .link {
+        color: rgb(50, 150, 225);
+      }
+
+      .link-creator {
+        display: flex;
+        background-color: rgb(255, 255, 255);
+        width: 260px;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 0px 10px rgb(225, 225, 225);
+        font-size: 1.2rem;
+        font-family: Helvetica;
+      }
+      .link-creator-input {
+        white-space: nowrap;
+        overflow-x: auto;
+        flex: 1;
+        margin-right: 10px;
+      }
+      .link-creator-input:focus {
+        outline: none;
+      }
+      .link-creator-cancel {
+        margin-right: 10px;
+      }
+      .link-creator-cancel, .link-creator-confirm {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .link-creator-cancel:hover, .link-creator-confirm:hover {
+        cursor: pointer;
+      }
+
+      .users {
+        pointer-events: none;
+        display: inline-block;
+        margin-top: 20px;
+        padding: 20px 50px;
+        width: 60vw;
+        overflow-y: auto;
+        box-shadow: 0px 0px 10px rgb(225, 225, 225);
+        border-radius: 20px;
+        font-size: 1.2rem;
+        font-family: Helvetica;
+        transition: box-shadow 0.25s;
+        text-align: center;
+      }
     </style>
   </head>
   <body>
-    <div class="buttons"><div class="button bold" id="bold">B</div><div class="button italic" id="italic">I</div><div class="button underline" id="underline">U</div></div>
+    <div class="buttons"><div class="button bold" id="bold">B</div><div class="button italic" id="italic">I</div><div class="button underline" id="underline">U</div><div class="button strikethrough" id="strikethrough">S</div><div class="button link" id="link">K</div></div>
     <div id="editor" contenteditable="plaintext-only"></div>
+    <div class="users">Active: ... &nbsp&nbsp|&nbsp&nbsp Idle: ...</div>
     <script type="module">
 
       // Things to make this even better:
@@ -81,6 +142,8 @@
 
       /* also to implement:
 
+      [NOTE/TODO] pay attention to NOTEs and TODOs!!!
+
             - [DONE!!] deleting
                 ([DONE!!]including deleting selections of text)
             - [DONE!!] pasting
@@ -88,14 +151,24 @@
 
         [DONE!!]: spaces (when typed) are not treated as char 160 on the client's end (e.preventDefault() is needed??) [FIXED BY CHANGING ALL TO SPACES]
 
-        [TODO]: sync in the background when not focused (ignore changes, basically)
+        [CANCELED]: sync in the background when not focused (ignore changes, basically)
         [DONE!!]: periodically check sync(?)
         [DONE!! IMPORTANT] ==> remove old "changes" ( > 10 mins old (?)) [remove them if all users have updated to them; check the lastUpdated timestamp in user data and if all are > timestamp for change, delete it]
 
         [TODO]: display cursor positions + selections => USE SPANS!!!
 
+        [DONE!!]: check styling on syncing
+
+        [DONE!!] status sometimes not pushed to firebase??? (might be bc laptop fell asleep + ondisconnect was called; see if theres a reconnect function or smth??)
+
         [DONE!!]: bold, italics, underlining
-        [TODO]: strikethrough, links
+        [DONE!!]: strikethrough
+        [DONE!!]: links!! :D
+        [DONE!!]: implement links themselves
+        [DONE!!]: send link changes
+        [DONE!!]: store links in Firebase
+        [DONE!!]: sync if links are not synced up properly
+        [DONE!!]: undo/redo links
 
         [DONE!!]: \n sometimes changes to \r (???? might've been bc i was screwing around with cursor stuff... might not be an issue but still test anyway)
         [DONE!! (MIGHT BE FIXED??)]: sometimes when one person is typing and the other is typing / deletes, their cursor will jump to the start of the doc which is kinda annoying
@@ -108,16 +181,21 @@
 
         [DONE!!] before and after checking should stop at index -1 (or -2 idk) or at the end of the text content; otherwise, you might get false positives which is not ideal
 
-        [TODO (SOMEWHAT DONE!!)]: HANDLE dragging + dropping text??? [TODO]: allow when only 1 person editing
-        [TODO (SOMEWHAT DONE!!)] HANDLE CTRL + Z (should be disabled if multiple editors at same time; or immediate sync(?) assuming client is up-to-date) [TODO]: allow when only 1 person editing
+        [DONE!!]: HANDLE dragging + dropping text???
+        [DONE!!] HANDLE CTRL + Z (should be disabled if multiple editors at same time; or immediate sync(?) assuming client is up-to-date)
 
-        [TODO] TO TEST: try out multiple docs!! the code should be setup for it already, just need to change depending on what div is focused :)
+        [NOTE] TO TEST: try out multiple docs!! the code should be setup for it already, just need to change depending on what div is focused :)
 
-        [TODO] replacing formatted text should copy that text's formatting (first char? idk check what docs does)
+        [DONE!!] replacing formatted text should copy that text's formatting (first char? idk check what docs does)
         [TODO] clicking "bold" or "italic" or "underline" should store those values in some variable + apply styles when key is pressed; wipe if arrow key or mouse is clicked
-        [TODO] ctrl + b should bold, ctrl + i should italic, etc.
+        [DONE!!] ctrl + b should bold, ctrl + i should italic, etc.
         [DONE!!] send style updates to firebase
         [DONE!!] store styling in firebase somewhere
+
+        [DONE!!] send undo as a change, rather than the actual event itself LOL [I THINK I FIXED THIS TOO LMAOOOOOOO; test it ig????]
+        [DONE!!] moving text around still doesn't work (insertFromDrop) [I THINK I FIXED IT??? TEST THIS AND ALSO TEST WHEN EVERYONE IS ABLE TO MOVE STUFF AROUND]
+        [DONE!!] Get spell corrections working!
+        [DONE!!] Deny emojis
       */
 
       // [DONE!!] handle errors when not focused on anything and a change is sent
@@ -147,8 +225,14 @@
       let prevContentUpdated = 0;
       let contentCheck = 0;
       let lastInputTimeStamp = 0;
+      let activeVertex = false;
+      let userIsAlone = false;
+      let stack = {
+        undo: [],
+        redo: []
+      };
 
-      let contentCheckDelay = 5; // [TODO]
+      let contentCheckDelay = 5;
 
       window.addEventListener("load", async function() {
 
@@ -156,12 +240,13 @@
         onDisconnect(ref(db, `users/${uid}`)).remove();
 
         // Get the stored text for the editor:
-        let content = (await getData("vertexes/editor/content", function(err) { console.error(err); })) || { text: "\n", style: { bold: "", italic: "", underline: "" }, uid: "", updated: 0 };
+        let content = (await getData("vertexes/editor/content", function(err) { console.error(err); })) || { vertex: "editor", text: "\n", style: { bold: "", italic: "", underline: "", strikethrough: "" }, uid: "", updated: 0 };
         setText(document.getElementById("editor"), content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
         setStyle(document.getElementById("editor"), content.style);
+        setLinks(document.getElementById("editor"), content.links);
 
         // Update the "applied" values:
-        let changesObj = await getData("vertexes/editor/changes", function(err) { console.error(err); });
+        let changesObj = await getData("changes", function(err) { console.error(err); });
         for (let i in changesObj) {
           applied.push(i);
         }
@@ -169,111 +254,150 @@
         // Set the user data:
         set(ref(db, `users/${uid}`), {
           status: "active",
-          // vertex: null, [TODO] remove once implemented
-          // cursor: {
-          //   start: null,
-          //   end: null
-          // },
+          vertex: false,
+          cursor: false,
           changed: new Date().getTime(),
           updated: new Date().getTime()
         });
 
-        // Get new data coming in:
-        onValue(ref(db, "vertexes/editor/changes"), (snapshot) => {
+        // Get user data:
+        onValue(ref(db, "users"), (snapshot) => {
+          const userData = snapshot.val();
+
+          if (!uid)
+            return;
+
+          // Check for disconnects:
+          if (!userData || !userData[uid] || !userData[uid].status) {
+            uid = "";
+            alert("You have been disconnected from Firebase. Reloading...");
+            location.reload(true);
+            return;
+          }
+
+          // Determine if the user is the only one editing the current vertex:
+          let alone = true;
+          for (let u in userData) {
+            if (u !== uid && userData[u].vertex === activeVertex) {
+              alone = false;
+              break;
+            }
+          }
+          userIsAlone = alone;
+
+          // console.log(userIsAlone);
+
+          // Update user status:
+          let statusData = {
+            active: 0,
+            idle: 0
+          };
+          for (let u in userData) {
+            statusData[userData[u].status]++;
+          }
+
+          document.getElementsByClassName("users")[0].innerHTML = `Active: ${statusData.active} &nbsp&nbsp|&nbsp&nbsp Idle: ${statusData.idle}`;
+
+        });
+
+        // Get new changes coming in:
+        onValue(ref(db, "changes"), (snapshot) => {
           const changes = snapshot.val();
           checkForChanges(changes);
         });
 
         // Check to ensure the clients are all synced properly:
         onValue(ref(db, "vertexes/editor/content"), (snapshot) => {
-          const content = snapshot.val() || { text: "\n", style: { bold: "", italic: "", underline: "" }, uid: "", updated: 0 };
 
-          // Ignore if the update is old:
-          if (content.updated >= prevContentUpdated) {
-            prevContentUpdated = content.updated
-          } else {
-            return;
-          }
-
-          // Ignore if the update was by the same user:
-          if (content.uid === uid)
-            return;
-
-          // Not synced! If this continues for 5 more edits, sync up the client:
-          if (content.text !== document.getElementById("editor").textContent) {
-            contentCheck++;
-
-            if (contentCheck >= contentCheckDelay) {
-
-              if (getTime() - lastKeyPress <= 1000)
-                return;
-
-              let caretPos = getCaretPosition(document.getElementById("editor"));
-
-              document.getElementById("editor").textContent = "";
-              setText(document.getElementById("editor"), content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
-              setStyle(document.getElementById("editor"), content.style);
-              setCaretPosition(document.getElementById("editor"), caretPos);
-
-              contentCheck = 0;
-            }
-
-          } else {
-            contentCheck = 0;
-          }
-
+          const content = snapshot.val() || { vertex: "editor", text: "\n", style: { bold: "", italic: "", underline: "", strikethrough: "" }, uid: "", updated: 0 };
+          sync(content);
         });
 
         // Also check syncing periodically:
         setInterval(async function() {
 
-          let content = (await getData("vertexes/editor/content", function(err) { console.error(err); })) || { text: "\n", style: { bold: "", italic: "", underline: "" }, uid: "", updated: 0 };
+          let content = (await getData("vertexes/editor/content", function(err) { console.error(err); })) || { vertex: "editor", text: "\n", style: { bold: "", italic: "", underline: "", strikethrough: "" }, uid: "", updated: 0 };
+          sync(content);
+        }, 250);
 
-          // Ignore if the update is old:
-          if (content.updated >= prevContentUpdated) {
-            prevContentUpdated = content.updated
-          } else {
-            return;
-          }
+        // Check for idle users and remove disconnected users:
+        setInterval(async function() {
 
-          // Ignore if the update was by the same user:
-          if (content.uid === uid)
-            return;
+          let users = (await getData("users", function(err) { console.error(err); })) || { vertex: "editor", text: "\n", style: { bold: "", italic: "", underline: "", strikethrough: "" }, uid: "", updated: 0 };
 
-          // Not synced! If this continues for 5 more edits, sync up the client:
-          if (content.text !== document.getElementById("editor").textContent) {
-            contentCheck++;
+          // Check if a user is idle or should be kicked:
+          for (let u in users) {
 
-            if (contentCheck >= contentCheckDelay) {
-
-              if (getTime() - lastKeyPress <= 1000)
-                return;
-
-              let caretPos = getCaretPosition(document.getElementById("editor"));
-
-              document.getElementById("editor").textContent = "";
-              setText(document.getElementById("editor"), content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
-              setStyle(document.getElementById("editor"), content.style);
-              setCaretPosition(document.getElementById("editor"), caretPos);
-
-              contentCheck = 0;
+            // Set status to idle if no changes have been made for more than 5 minutes:
+            if (users[u].status === "active" && getTime() - users[u].changed >= 5 * 60 * 1000) {
+              set(ref(db, `users/${u}/status`), "idle");
             }
 
-          } else {
+            // Remove user from the database if they have not recieved an update for more than 10 minutes [NOTE when implementing into real thing, take the last updated time into consideration (for example, a user should only be kicked if they have not recieved an update 5 minutes after the last time the content itself was updated)]:
+            if (!users[u].status || getTime() - users[u].updated >= 10 * 60 * 1000) {
+              remove(ref(db, `users/${u}`));
+            }
+          }
+
+
+        }, 5 * 1000);
+      });
+
+      function sync(content) {
+
+        // Ignore if the update is old:
+        if (content.updated >= prevContentUpdated) {
+          prevContentUpdated = content.updated;
+        } else {
+          return;
+        }
+
+        // Ignore if the update was by the same user:
+        if (content.uid === uid)
+          return;
+
+        // Not synced! If this continues for 5 more loops (1.25 seconds), sync up the client:
+        if (content.text !== document.getElementById("editor").textContent || content.style.bold !== ([...document.getElementById("editor").childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join("")) || content.style.italic !== ([...document.getElementById("editor").childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join("")) || content.style.underline !== ([...document.getElementById("editor").childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join("")) || content.style.strikethrough !== ([...document.getElementById("editor").childNodes].map(el => el.classList.contains("strikethrough") ? "X" : "_").slice(0, -1).join("")) || JSON.stringify(content.links) !== JSON.stringify([...document.getElementById("editor").childNodes].map(el => el.dataset.href || "").slice(0, -1))) {
+
+          contentCheck++;
+
+          if (contentCheck >= contentCheckDelay) {
+
+            if (getTime() - lastKeyPress <= 1000)
+              return;
+
+            let caretPos = getCaretPosition(document.getElementById("editor"));
+
+            document.getElementById("editor").textContent = "";
+            setText(document.getElementById("editor"), content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
+            setStyle(document.getElementById("editor"), content.style);
+            setLinks(document.getElementById("editor"), content.links);
+            setCaretPosition(document.getElementById("editor"), caretPos);
+
             contentCheck = 0;
           }
 
-          // console.log("CC: " + contentCheck);
-
-        }, 250);
-
-      });
+        } else {
+          contentCheck = 0;
+        }
+      }
 
       document.getElementById("editor").addEventListener("keydown", async function(e) {
 
-        // Prevent defualt behavior of most keys (alpha-numerical and delete/backspace):
+        // Update cursor position in Firebase (after event finishes):
+        setTimeout(function() {
+          set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.getElementById("editor")));
+        }, 0);
+
+        // Close the link creator:
+        while (document.getElementsByClassName("link-creator").length > 0) {
+          document.getElementsByClassName("link-creator")[0].remove();
+        }
+        clearSelections();
+
+        // Prevent defualt behavior of most keys (alpha-numerical, delete/backspace, undo/redo, styling keys):
         // Note that this disables the use of ctrl + backspace/delete; this is done on purpose since its behavior is sometimes hard to predict (especially with special characters)
-        if ((!e.ctrlKey && e.key.length === 1) || (e.keyCode === 8 || e.keyCode === 46 || e.keyCode === 13))
+        if ((!e.ctrlKey && e.key.length === 1) || (e.keyCode === 8 || e.keyCode === 46 || e.keyCode === 13) || (e.ctrlKey && (e.keyCode === 90 || e.keyCode === 89 || e.keyCode === 66 || e.keyCode === 73 || e.keyCode === 85 || e.keyCode === 83 || e.keyCode === 75)))
           e.preventDefault();
 
         let caretPos = getCaretPosition(this);
@@ -290,6 +414,7 @@
           // No selection:
           if (caretPos.start === caretPos.end) {
             buffer({
+              vertex: "editor",
               uid: uid,
               timestamp: getTime(),
               action: "delete",
@@ -297,7 +422,7 @@
               index: caretPos.end - (e.keyCode === 8 ? 1 : 0),
               surrounding: {
                 before: this.textContent[caretPos.end - 1 - (e.keyCode === 8 ? 1 : 0)] || false,
-                after: this.textContent[caretPos.end + (e.keyCode === 46 ? 1 : 0)] || false
+                after: ((caretPos.end + (e.keyCode === 46 ? 1 : 0)) === this.textContent.length - 1 && this.textContent[caretPos.end + (e.keyCode === 46 ? 1 : 0)] === "\n") ? false : (this.textContent[caretPos.end + (e.keyCode === 46 ? 1 : 0)] || false)
               }
             });
 
@@ -309,6 +434,7 @@
           // Selection:
           } else {
             buffer({
+              vertex: "editor",
               uid: uid,
               timestamp: getTime(),
               action: "replace",
@@ -320,7 +446,7 @@
               },
               surrounding: {
                 before: this.textContent[caretPos.start - 1] || false,
-                after: this.textContent[caretPos.end] || false
+                after: (caretPos.end === this.textContent.length - 1 && this.textContent[caretPos.end] === "\n") ? false : (this.textContent[caretPos.end] || false)
               }
             });
 
@@ -331,12 +457,65 @@
           }
         }
 
+        // Handle undo/redo:
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 90 && stack.undo.length > 0) { // Ctrl + Z (Undo)
+          execUndo();
+        }
+        if ((e.ctrlKey && e.shiftKey && e.keyCode === 90 || e.ctrlKey && e.keyCode === 89) && stack.redo.length > 0) { // Ctrl + Shift + Z or Ctrl + y (Redo)
+          execRedo();
+        }
+
+        // Handle styling keys and link keys:
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 66) { // Ctrl + B (Bold)
+          if (caretPos.start === caretPos.end) {
+
+            // [TODO] handle when nothing is selected
+
+          } else {
+            applyStyle(document.getElementById("editor"), "bold");
+          }
+        }
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 73) { // Ctrl + I (Italic)
+          if (caretPos.start === caretPos.end) {
+
+            // [TODO] handle when nothing is selected
+
+          } else {
+            applyStyle(document.getElementById("editor"), "italic");
+          }
+        }
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 85) { // Ctrl + U (underline)
+          if (caretPos.start === caretPos.end) {
+
+            // [TODO] handle when nothing is selected
+
+          } else {
+            applyStyle(document.getElementById("editor"), "underline");
+          }
+        }
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 83) { // Ctrl + S (Strikethrough)
+          if (caretPos.start === caretPos.end) {
+
+            // [TODO] handle when nothing is selected
+
+          } else {
+            applyStyle(document.getElementById("editor"), "strikethrough");
+          }
+        }
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 75) { // Ctrl + K (Link)
+          if (caretPos.start !== caretPos.end) {
+            createLink(this);
+          }
+        }
+
         // If we aren't dealing with a normal key, return now:
         if (e.keyCode !== 13 && (e.ctrlKey || e.altKey || e.key.length > 1))
           return;
 
+        // Handle typing/selecting text and typing:
         if (caretPos.start === caretPos.end) {
           buffer({
+            vertex: "editor",
             uid: uid,
             timestamp: getTime(),
             action: "type",
@@ -352,6 +531,7 @@
           attemptToPushChanges(lastKeyPress);
         } else {
           buffer({
+            vertex: "editor",
             uid: uid,
             timestamp: getTime(),
             action: "replace",
@@ -363,7 +543,7 @@
             },
             surrounding: {
               before: this.textContent[caretPos.start - 1] || false,
-              after: this.textContent[caretPos.end] || false
+              after: (caretPos.end === this.textContent.length - 1 && this.textContent[caretPos.end] === "\n") ? false : (this.textContent[caretPos.end] || false)
             }
           });
 
@@ -377,35 +557,159 @@
 
       document.getElementById("editor").addEventListener("input", function(e) {
 
-        // Prevent recursive calls:
-        if (Math.abs(lastInputTimeStamp - e.timeStamp) <= 1) {
+        // Update cursor position in Firebase (after event finishes):
+        setTimeout(function() {
+          set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.getElementById("editor")));
+        }, 0);
+
+        // Undo was due to insertFromDrop and should be ignored:
+        if (Math.abs(lastInputTimeStamp - e.timeStamp) <= 1000 || lastInputTimeStamp === Infinity) {
           return;
         }
 
-        // Immediately push spelling corrections:
-        if (e.inputType === "insertReplacementText") {
-          lastKeyPress = getTime();
-          attemptToPushChanges(lastKeyPress);
-        }
-
-        // [TODO]: allow undo/redo/inserting text by drop/etc. if only 1 user editing
-        // Prevent undo/redo:
+        // Prevent undo/redo from the context menu (since the custom stack should be used instead):
         if (e.inputType === "historyUndo") {
-          lastInputTimeStamp = e.timeStamp;
-          document.execCommand("redo");
+
+          // Delete the undo:
+          let caretPos = getCaretPosition(this);
+          setText(this, "", caretPos);
+
+          // Then alert the user to use "Ctrl + Z" instead:
+          alert("Undo from the context menu is not supported.\n\nPlease use \"Ctrl + Z\" instead.");
           return;
         }
-        if (e.inputType === "historyRedo" || e.inputType === "insertFromDrop") {
+        if (e.inputType === "historyRedo") {
+
+          // Undo the redo:
           lastInputTimeStamp = e.timeStamp;
           document.execCommand("undo");
+
+          // Then alert the user to use "Ctrl + Y" instead:
+          alert("Redo from the context menu is not supported.\n\nPlease use \"Ctrl + Y\" instead.");
           return;
         }
 
-        // [TODO] push undo/redo changes to firebase if only 1 user editing
+        // Handle dropped text:
+        if (e.inputType === "insertFromDrop") {
+
+          // Perform the insertion (since the dropped text is selected after the insertion):
+          let insertCaretPos = getCaretPosition(this);
+
+          buffer({
+            vertex: "editor",
+            uid: uid,
+            timestamp: getTime(),
+            action: "insert",
+            content: this.textContent.substring(insertCaretPos.start, insertCaretPos.end),
+            index: insertCaretPos.start,
+            surrounding: {
+              before: this.textContent[insertCaretPos.start - 1] || false,
+              after: (insertCaretPos.end === this.textContent.length - 1 && this.textContent[insertCaretPos.end] === "\n") ? false : (this.textContent[insertCaretPos.end] || false)
+            }
+          });
+
+          setText(this, this.textContent.substring(insertCaretPos.start, insertCaretPos.end), { start: insertCaretPos.start, end: insertCaretPos.start });
+
+          // Then undo the insertion:
+          lastInputTimeStamp = e.timeStamp;
+          document.execCommand("undo");
+
+          // Then remove where the text originated from (since the original text is selected after the undo):
+          let preCaretPos = getCaretPosition(this);
+
+          if (this.textContent.substring(preCaretPos.start, preCaretPos.end).length > 0) {
+
+            buffer({
+              vertex: "editor",
+              uid: uid,
+              timestamp: getTime(),
+              action: "replace",
+              contentPre: this.textContent.substring(preCaretPos.start, preCaretPos.end),
+              content: "",
+              index: {
+                start: preCaretPos.start,
+                end: preCaretPos.end
+              },
+              surrounding: {
+                before: this.textContent[preCaretPos.start - 1] || false,
+                after: (preCaretPos.end === this.textContent.length - 1 && this.textContent[preCaretPos.end] === "\n") ? false : (this.textContent[preCaretPos.end] || false)
+              }
+            });
+
+            setText(this, "", preCaretPos, true);
+          }
+
+          setCaretPosition(this, { start: insertCaretPos.end, end: insertCaretPos.end });
+
+          lastKeyPress = getTime();
+          attemptToPushChanges(lastKeyPress);
+          return;
+        }
+
+        // Handle spelling corrections:
+        if (e.inputType === "insertReplacementText") {
+
+          // Start by undoing the spelling correction (to determine the original text):
+          lastInputTimeStamp = e.timeStamp;
+          document.execCommand("undo");
+
+          // The original text is now selected:
+          let preCaretPos = getCaretPosition(this);
+          let contentPre = this.textContent.substring(preCaretPos.start, preCaretPos.end);
+
+          // Then, redo the spelling correction (to determine the new text):
+          lastInputTimeStamp = e.timeStamp;
+          document.execCommand("redo");
+
+          // The cursor will always be placed after the end of the spelling correction; we know where the spelling correction starts because the spelling correction is always inserted starting at the beginning of the previous selection:
+          let postCaretPos = { start: preCaretPos.start, end: getCaretPosition(this).end }; // Note that since the spelling correction is stored in just one element, the end node is really the start + 1
+          let content = this.textContent.substring(postCaretPos.start, postCaretPos.end);
+
+          buffer({
+            vertex: "editor",
+            uid: uid,
+            timestamp: getTime(),
+            action: "replace",
+            contentPre: contentPre,
+            content: content,
+            index: {
+              start: preCaretPos.start,
+              end: preCaretPos.end
+            },
+            surrounding: {
+              before: this.textContent[preCaretPos.start - 1] || false,
+              after: (preCaretPos.end === this.textContent.length - 1 && this.textContent[preCaretPos.end] === "\n") ? false : (this.textContent[preCaretPos.end] || false)
+            }
+          });
+
+          setText(this, content, { start: preCaretPos.start, end: preCaretPos.start + 1 });
+
+          lastKeyPress = getTime();
+          attemptToPushChanges(lastKeyPress);
+          return;
+        }
+
+        // Handle emojis:
+        if (e.inputType === "insertCompositionText") {
+
+          lastInputTimeStamp = Infinity;
+
+          // Alert the user that this is not supported:
+          alert("Inserting emojis from the context menu is not supported.\n\nPlease copy and paste the emojis in using \"Ctrl + C\" (copy) and \"Ctrl + V\" (paste) instead.");
+
+          // Disconnect the user:
+          remove(ref(db, `users/${uid}`));
+          return;
+        }
 
       });
 
       document.getElementById("editor").addEventListener("paste", function(e) {
+
+        // Update cursor position in Firebase (after event finishes):
+        setTimeout(function() {
+          set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.getElementById("editor")));
+        }, 0);
 
         let caretPos = getCaretPosition(this);
 
@@ -416,6 +720,7 @@
         // Push pasted text
         if (caretPos.start === caretPos.end) {
           buffer({
+            vertex: "editor",
             uid: uid,
             timestamp: getTime(),
             action: "insert",
@@ -431,6 +736,7 @@
           attemptToPushChanges(lastKeyPress);
         } else {
           buffer({
+            vertex: "editor",
             uid: uid,
             timestamp: getTime(),
             action: "replace",
@@ -457,6 +763,11 @@
 
       document.getElementById("editor").addEventListener("cut", function(e) {
 
+        // Update cursor position in Firebase (after event finishes):
+        setTimeout(function() {
+          set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.getElementById("editor")));
+        }, 0);
+
         let caretPos = getCaretPosition(this);
 
         // Push removed text
@@ -464,6 +775,7 @@
           return;
 
         buffer({
+          vertex: "editor",
           uid: uid,
           timestamp: getTime(),
           action: "replace",
@@ -475,7 +787,7 @@
           },
           surrounding: {
             before: this.textContent[caretPos.start - 1] || false,
-            after: this.textContent[caretPos.end] || false
+            after: this.textContent[caretPos.end] || false // [TODO] update all of these to check for the \n text node~
           }
         });
 
@@ -484,12 +796,93 @@
 
       });
 
-      function setText(el, text, pos, ignoreCursor) {
+      document.getElementById("editor").addEventListener("focus", function(e) {
+
+        // Set this to be the active vertex:
+        activeVertex = "editor";
+        setTimeout(function() {
+          set(ref(db, `users/${uid}/cursor`), getCaretPosition(this));
+        }, 0);
+        set(ref(db, `users/${uid}/vertex`), "editor");
+
+      });
+
+      document.getElementById("editor").addEventListener("blur", function(e) {
+
+        // Remove this from being the active vertex:
+        activeVertex = false;
+        set(ref(db, `users/${uid}/cursor`), false);
+        set(ref(db, `users/${uid}/vertex`), false);
+
+      });
+
+      document.body.addEventListener("mousedown", function(e) {
+
+        // Close the link popup if it is clicked off of:
+        if (e.target.id !== "link" && !e.target.classList.contains("link-creator-element")) {
+          while (document.getElementsByClassName("link-creator").length > 0) {
+            document.getElementsByClassName("link-creator")[0].remove();
+          }
+          clearSelections();
+        }
+
+        // Check for links and update cursor position in Firebase (after event finishes):
+        setTimeout(function() {
+
+          let caretPos = document.activeElement.id ? getCaretPosition(document.activeElement) : false; // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+
+          if (document.activeElement.id) { // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+
+            // Check if the element clicked is a link:
+            if (caretPos.start === caretPos.end && document.activeElement.childNodes[caretPos.end].dataset.href) { // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+
+              // Find the start and the end of the link, then select it:
+              let start, end, spans = document.activeElement.childNodes;
+              for (start = caretPos.start; start > 0; start--) {
+                if (spans[start - 1].dataset.href !== spans[caretPos.start].dataset.href)
+                  break;
+              }
+              for (end = caretPos.start; end < document.activeElement.textContent.length; end++) {
+                if (spans[end].dataset.href !== spans[caretPos.start].dataset.href)
+                  break;
+              }
+
+              setCaretPosition(document.activeElement, { start: start, end: end });
+
+              // Once this is done, open the link editor:
+              createLink(document.activeElement, document.activeElement.childNodes[caretPos.end].dataset.href);
+            }
+
+            // Update cursor position in Firebase:
+            set(ref(db, `users/${uid}/cursor`), caretPos);
+          }
+        }, 0);
+
+      });
+      document.body.addEventListener("mouseup", function() {
+
+        // Update cursor position in Firebase (after event finishes):
+        setTimeout(function() {
+          if (document.activeElement.id) { // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+            set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.activeElement));
+          }
+        }, 0);
+
+      });
+
+      function setText(el, text, pos, ignoreCursor, style, href) {
 
         // There was a text selection that is being overridden; remove the text being overridden:
         if (pos.start !== pos.end) {
+
+          // Use the styling and href of the first element if text is being overridden:
+          style = el.childNodes[pos.start] ? (el.childNodes[pos.start].classList ? ((pos.start >= 0 && el.childNodes[pos.start].classList.value) ? ` class="${el.childNodes[pos.start].classList.value.split("selected").join("")}"` : "") : ` class=""` /* < Element is a text DOM element */) : "";
+          href = el.childNodes[pos.start] ? (el.childNodes[pos.start].dataset ? ((pos.start >= 0 && el.childNodes[pos.start].dataset.href) ? ` data-href="${el.childNodes[pos.start].dataset.href}"` : "") : ` data-href=""` /* < Element is a text DOM element */) : "";
+
+          // Remove the text being overridden:
           for (let i = pos.end - 1; i >= pos.start; i--) {
-            el.childNodes[i].remove();
+            if (el.childNodes[i])
+              el.childNodes[i].remove();
           }
         }
 
@@ -500,7 +893,7 @@
         // If the text to be inserted contains multiple characters, use a recursive call to add them one at a time (in order):
         if (text.length > 1) {
           for (let i = 0; i < text.length; i++) {
-            setText(el, text[i], { start: pos.start + i, end: pos.start + i }, true);
+            setText(el, text[i], { start: pos.start + i, end: pos.start + i }, true, style, href);
           }
 
           if (!ignoreCursor)
@@ -510,10 +903,11 @@
         }
 
         // Only 1 character is to be added; get the styles and append the element to the editor:
-        let classList = (pos.start - 1 >= 0 && el.childNodes[pos.start - 1].classList.value) ? ` class="${el.childNodes[pos.start - 1].classList.value}"` : "";
+        let classList = style ? style : (el.childNodes[pos.start - 1] ? ((pos.start - 1 >= 0 && el.childNodes[pos.start - 1].classList.value) ? ` class="${el.childNodes[pos.start - 1].classList.value}"` : "") : "");
+        let hrefData = href ? href : (el.childNodes[pos.start - 1] ? ((pos.start - 1 >= 0 && el.childNodes[pos.start - 1].dataset.href) ? ` data-href="${el.childNodes[pos.start - 1].dataset.href}"` : "") : "");
 
         let span = document.createElement("div");
-        span.innerHTML = `<span${classList}>${text}</span>`;
+        span.innerHTML = `<span${classList}${hrefData}>${text}</span>`;
         if (pos === el.textContent.length) {
           el.appendChild(span.childNodes[0]);
         } else {
@@ -526,6 +920,7 @@
 
       }
 
+      // Styling and Link button event handlers:
       document.getElementById("bold").addEventListener("mousedown", function(e) {
         e.preventDefault();
         applyStyle(document.getElementById("editor"), "bold");
@@ -538,9 +933,33 @@
         e.preventDefault();
         applyStyle(document.getElementById("editor"), "underline");
       });
+      document.getElementById("strikethrough").addEventListener("mousedown", function(e) {
+        e.preventDefault();
+        applyStyle(document.getElementById("editor"), "strikethrough");
+      });
+      document.getElementById("link").addEventListener("mousedown", function(e) {
+        e.preventDefault();
+
+        // Close old link creators:
+        while (document.getElementsByClassName("link-creator").length > 0) {
+          document.getElementsByClassName("link-creator")[0].remove();
+        }
+        clearSelections();
+
+        // Can't create a link if no element is selected:
+        if (!document.activeElement.id) // [NOTE] update in future for better checks
+          return;
+
+        let caretPos = getCaretPosition(document.activeElement);
+
+        // Open a new link creator if there is a selection:
+        if (caretPos.start !== caretPos.end)
+          createLink(document.getElementById("editor"));
+      });
 
       function setStyle(el, styles) {
 
+        // Override all styles with the passed in "styles":
         for (let style in styles) {
           for (let i = 0; i < styles[style].length; i++) {
             if (styles[style][i] === "X") {
@@ -576,6 +995,7 @@
 
           // Push changes:
           buffer({
+            vertex: "editor",
             uid: uid,
             timestamp: getTime(),
             action: "style",
@@ -605,34 +1025,346 @@
         }
       }
 
+      function createLink(el, link) {
+
+        let spans = el.childNodes;
+        let caretPos = getCaretPosition(el);
+
+        // Display that the text is still selected:
+        for (let i = caretPos.start; i < caretPos.end; i++) {
+          spans[i].classList.add("selected");
+        }
+
+        // Get the position of the selected text on the display:
+        let selectionPos = getSelectionPosition(caretPos);
+
+        // Create the div to insert a link:
+        let div = document.createElement("div");
+        div.innerHTML = `<div class="link-creator link-creator-element" style="position: absolute; left: calc(${selectionPos.x + selectionPos.w / 2}px - 150px); top: calc(${selectionPos.y + selectionPos.h}px + 20px);">
+          <div class="link-creator-input link-creator-element" contenteditable="true">
+            ${link || ""}
+          </div>
+          <div class="link-creator-cancel link-creator-element">
+            <img src="./resources/icons/close.svg" class="link-creator-element">
+          </div>
+          <div class="link-creator-confirm link-creator-element">
+            <img src="./resources/icons/confirm.svg" class="link-creator-element">
+          </div>
+        </div>`;
+
+        // Display it to the user:
+        document.body.appendChild(div.childNodes[0]);
+
+        // Focus the input and add event listeners:
+        let linkCreator = document.getElementsByClassName("link-creator")[document.getElementsByClassName("link-creator").length - 1];
+
+        if (!link)
+          linkCreator.getElementsByClassName("link-creator-input")[0].focus();
+
+        // Clean pasted text:
+        linkCreator.addEventListener("paste", function(e) {
+          e.preventDefault();
+          let textToPaste = e.clipboardData.getData("text/plain");
+          document.execCommand("insertHTML", false, textToPaste);
+        });
+
+        // Close button:
+        linkCreator.getElementsByClassName("link-creator-cancel")[0].addEventListener("click", function() {
+          applyLink(el, el.childNodes[caretPos.start].dataset.href, caretPos, false, true);
+          linkCreator.remove();
+          clearSelections();
+          el.focus();
+          setCaretPosition(el, { start: caretPos.end, end: caretPos.end });
+        });
+
+        // Confirm button:
+        linkCreator.getElementsByClassName("link-creator-confirm")[0].addEventListener("click", function() {
+          if (linkCreator.getElementsByClassName("link-creator-input")[0].textContent.trim() !== "")
+            applyLink(el, linkCreator.getElementsByClassName("link-creator-input")[0].textContent, caretPos, true, true);
+          linkCreator.remove();
+          clearSelections();
+          el.focus();
+          setCaretPosition(el, { start: caretPos.end, end: caretPos.end });
+        });
+
+        // Handle enter:
+        linkCreator.getElementsByClassName("link-creator-input")[0].addEventListener("keydown", function(e) {
+          if (e.keyCode === 13) {
+            e.preventDefault();
+            if (linkCreator.getElementsByClassName("link-creator-input")[0].textContent.trim() !== "")
+              applyLink(el, linkCreator.getElementsByClassName("link-creator-input")[0].textContent, caretPos, true, true);
+            linkCreator.remove();
+            clearSelections();
+            el.focus();
+            setCaretPosition(el, { start: caretPos.end, end: caretPos.end });
+          }
+        });
+      }
+
+      function clearSelections() {
+
+        // Clear all elements with the "selected" class:
+        while (document.getElementsByClassName("selected").length > 0)
+          document.getElementsByClassName("selected")[0].classList.remove("selected");
+      }
+
+      function setLinks(el, links) {
+
+        // Override all links with the passed in "links":
+        for (let i = 0; i < links.length; i++) {
+          if (links[i]) {
+            applyLink(el, links[i], { start: i, end: i + 1 }, true, false);
+          }
+        }
+      }
+
+      function applyLink(el, link, pos, addLink, localChange) {
+
+        let spans = el.childNodes;
+
+        // Get current caret position:
+        if (!pos)
+          pos = getCaretPosition(el);
+
+        // If no pos is passed in, assume that this was a local change
+        if (localChange) {
+
+          // Push changes:
+          buffer({
+            vertex: "editor",
+            uid: uid,
+            timestamp: getTime(),
+            action: addLink ? "link" : "-link",
+            contentPre: el.textContent.substring(pos.start, pos.end),
+            content: link,
+            index: {
+              start: pos.start,
+              end: pos.end
+            },
+            surrounding: {
+              before: el.textContent[pos.start - 1] || false,
+              after: el.textContent[pos.end] || false
+            }
+          });
+
+          lastKeyPress = getTime();
+          attemptToPushChanges(lastKeyPress);
+        }
+
+        // Apply link:
+        for (let i = pos.start; i < pos.end; i++) {
+          if (addLink) {
+            spans[i].classList.add("link");
+            spans[i].dataset.href = link;
+          } else {
+            spans[i].classList.remove("link");
+            spans[i].removeAttribute("data-href");
+          }
+        }
+      }
+
+      function undo(c, buf) {
+
+        // Create and return a change that will undo whatever the passed in change changed:
+        switch(c.action) {
+          case "type":
+            return {
+              vertex: c.vertex,
+              uid: uid,
+              timestamp: getTime(),
+              action: "delete",
+              contentPre: c.content,
+              undo: buf,
+              index: c.index,
+              surrounding: {
+                before: document.getElementById(c.vertex).textContent[c.index - 1] || false,
+                after: (c.index + 1 === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index + 1] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index + 1] || false)
+              }
+            };
+          break;
+          case "delete":
+            return {
+              vertex: c.vertex,
+              uid: uid,
+              timestamp: getTime(),
+              action: "type",
+              content: c.contentPre,
+              undo: buf,
+              index: c.index,
+              surrounding: {
+                before: document.getElementById(c.vertex).textContent[c.index - 1] || false, // The first part of this conditional is to ignore the last "\n" that HTML sometimes autofills (for whatever reason):
+                after: (c.index === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index] || false)
+              }
+            };
+          break;
+          case "insert":
+            return {
+              vertex: c.vertex,
+              uid: uid,
+              timestamp: getTime(),
+              action: "replace",
+              contentPre: c.content,
+              content: "",
+              undo: buf,
+              index: {
+                start: c.index,
+                end: c.index + c.content.length
+              },
+              surrounding: {
+                before: document.getElementById(c.vertex).textContent[c.index - 1] || false,
+                after: document.getElementById(c.vertex).textContent[c.index + c.content.length] || false
+              }
+            };
+          break;
+          case "replace":
+            return {
+              vertex: c.vertex,
+              uid: uid,
+              timestamp: getTime(),
+              action: "replace",
+              contentPre: c.content,
+              content: c.contentPre,
+              undo: buf,
+              index: {
+                start: c.index.start,
+                end: c.index.start + c.content.length
+              },
+              surrounding: {
+                before: document.getElementById(c.vertex).textContent[c.index.start - 1] || false,
+                after: document.getElementById(c.vertex).textContent[c.index.start + c.content.length] || false
+              }
+            };
+          break;
+          case "style":
+            return {
+              vertex: c.vertex,
+              uid: uid,
+              timestamp: getTime(),
+              action: "style",
+              contentPre: c.contentPre,
+              content: (c.content[0] === "-" ? c.content.substring(1) : ("-" + c.content)),
+              undo: buf,
+              index: {
+                start: c.index.start,
+                end: c.index.end
+              },
+              surrounding: {
+                before: document.getElementById(c.vertex).textContent[c.index.start - 1] || false,
+                after: document.getElementById(c.vertex).textContent[c.index.end] || false
+              }
+            };
+          break;
+          case "-link":
+          case "link":
+            return {
+              vertex: c.vertex,
+              uid: uid,
+              timestamp: getTime(),
+              action: c.action[0] === "-" ? "link" : "-link",
+              contentPre: c.contentPre,
+              content: c.content,
+              undo: buf,
+              index: {
+                start: c.index.start,
+                end: c.index.end
+              },
+              surrounding: {
+                before: document.getElementById(c.vertex).textContent[c.index.start - 1] || false,
+                after: document.getElementById(c.vertex).textContent[c.index.end] || false
+              }
+            };
+          break;
+        }
+      }
+
+      function execUndo() {
+
+        // Undo the change:
+        applyChange(undo(stack.undo[stack.undo.length - 1]), true);
+        buffer(undo(stack.undo[stack.undo.length - 1], true), true);
+
+        // Push the undone change to the redo stack:
+        stack.redo.push(stack.undo[stack.undo.length - 1]);
+
+        // Clear the undone change from the undo stack:
+        stack.undo.pop();
+
+        // Push changes to Firebase:
+        lastKeyPress = getTime();
+        attemptToPushChanges(lastKeyPress);
+      }
+
+      function redo(c, buf) {
+
+        if (!buf)
+          return c;
+
+        // Update the UID, the timestamp, and set the "redo" key to true when sending out redo changes:
+        c.uid = uid;
+        c.timestamp = getTime();
+        c.redo = true;
+        return c;
+      }
+
+      function execRedo() {
+
+        // Redo the change:
+        applyChange(stack.redo[stack.redo.length - 1], true);
+        buffer(redo(stack.redo[stack.redo.length - 1], true), true);
+
+        // Push the undone change to the redo stack:
+        stack.undo.push(stack.redo[stack.redo.length - 1]);
+
+        // Clear the undone change from the undo stack:
+        stack.redo.pop();
+
+        // Push changes to Firebase:
+        lastKeyPress = getTime();
+        attemptToPushChanges(lastKeyPress);
+      }
+
       async function attemptToPushChanges(t) {
 
         // Check for changes on the server side:
-        let changesObj = await getData("vertexes/editor/changes", function(err) { console.error(err); });
+        let changesObj = await getData("changes", function(err) { console.error(err); });
 
         // This will check for changes and apply them if found; otherwise, the function will return false
         if (!checkForChanges(changesObj, t)) {
 
           // No changes to handle; push pending changes
+          let changedVertexes = [];
+
+          if (document.activeElement.id) // [NOTE] when implementing into actual editor, verify that this is an actual vertex
+            changedVertexes.push(document.activeElement.id);
+
           while (pending.length > 0) {
-            set(push(child(ref(db), "vertexes/editor/changes")), pending.splice(0, 1)[0]);
+
+            if (changedVertexes.indexOf(pending[0].vertex) === -1)
+              changedVertexes.push(pending[0].vertex);
+
+            set(push(child(ref(db), "changes")), pending.splice(0, 1)[0]);
           }
 
           // Update the stored content and the user changed time:
           setTimeout(function() {
-            set(ref(db, "vertexes/editor/content"), {
-              text: document.getElementById("editor").textContent + (document.getElementById("editor").textContent[document.getElementById("editor").textContent.length - 1] !== "\n" ? "\n" : ""),
-              style: {
-                bold: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join(""),
-                italic: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join(""),
-                underline: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join("")
-              },
-              updated: getTime(),
-              uid: uid
-            });
+            for (let i = 0; i < changedVertexes.length; i++) {
+              set(ref(db, `vertexes/${changedVertexes[i]}/content`), {
+                text: document.getElementById(changedVertexes[i]).textContent + (document.getElementById(changedVertexes[i]).textContent[document.getElementById(changedVertexes[i]).textContent.length - 1] !== "\n" ? "\n" : ""),
+                style: {
+                  bold: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join(""),
+                  italic: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join(""),
+                  underline: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join(""),
+                  strikethrough: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.classList.contains("strikethrough") ? "X" : "_").slice(0, -1).join("")
+                },
+                links: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.dataset.href || "").slice(0, -1),
+                updated: getTime(),
+                uid: uid
+              });
+            }
           }, 0);
           setTimeout(function() {
             set(ref(db, `users/${uid}/changed`), getTime());
+            set(ref(db, `users/${uid}/status`), "active");
           }, 0);
         }
 
@@ -671,23 +1403,11 @@
         }
 
         // After changes have been applied, update content and last updated date:
-        setTimeout(function() {
-          set(ref(db, "vertexes/editor/content"), {
-            text: document.getElementById("editor").textContent + (document.getElementById("editor").textContent[document.getElementById("editor").textContent.length - 1] !== "\n" ? "\n" : ""),
-            style: {
-              bold: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join(""),
-              italic: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join(""),
-              underline: [...document.getElementById("editor").childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join("")
-            },
-            updated: getTime(),
-            uid: uid
-          });
-        }, 0);
         setTimeout(async function() {
           await set(ref(db, `users/${uid}/updated`), changes[changes.length - 1].timestamp);
 
           let users = await getData("users", function(err) { console.error(err); });
-          let allChanges = await getData("vertexes/editor/changes", function(err) { console.error(err); });
+          let allChanges = await getData("changes", function(err) { console.error(err); });
 
           let allUpdated;
           for (let change in allChanges) {
@@ -698,8 +1418,25 @@
                 break;
               }
             }
-            if (allUpdated)
-              remove(ref(db, `vertexes/editor/changes/${change}`));
+            // If all clients have already applied this change, remove it and update the stored content:
+            if (allUpdated) {
+              remove(ref(db, `changes/${change}`));
+
+              if (allChanges[change].vertex === activeVertex) {
+                set(ref(db, `vertexes/${allChanges[change].vertex}/content`), {
+                  text: document.getElementById(allChanges[change].vertex).textContent + (document.getElementById(allChanges[change].vertex).textContent[document.getElementById(allChanges[change].vertex).textContent.length - 1] !== "\n" ? "\n" : ""),
+                  style: {
+                    bold: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join(""),
+                    italic: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join(""),
+                    underline: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join(""),
+                    strikethrough: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.classList.contains("strikethrough") ? "X" : "_").slice(0, -1).join("")
+                  },
+                  links: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.dataset.href || "").slice(0, -1),
+                  updated: getTime(),
+                  uid: uid
+                });
+              }
+            }
           }
         }, 0);
 
@@ -712,19 +1449,37 @@
 
       }
 
-      function applyChange(c) {
+      function applyChange(c, isUndoRedo) {
 
-        // console.log("CHANGE");
-        // console.log(c);
+        if (!isUndoRedo) {
+
+          // Apply undo/redo to local stack:
+          if (c.undo) {
+            if (stack.undo.length > 0) {
+              stack.redo.push(stack.undo[stack.undo.length - 1]);
+              stack.undo.pop();
+            }
+          } else if (c.redo) {
+            if (stack.redo.length > 0) {
+              stack.undo.push(stack.redo[stack.redo.length - 1]);
+              stack.redo.pop();
+            }
+
+          // Otherwise, this change was not an undo/redo itself; add this change to the local stack for future use:
+          } else {
+            stack.undo.push(c);
+            stack.redo = [];
+          }
+        }
 
         // Store the caret position and text content of the editor:
-        let caretPos = getCaretPosition(document.getElementById("editor"));
-        let t = document.getElementById("editor").textContent;
+        let caretPos = getCaretPosition(c.vertex);
+        let t = document.getElementById(c.vertex).textContent;
 
         // Remove the "\n" that is always present, but not actually able to be edited:
         t = (t[t.length - 1] === "\n") ? (t.substring(0, t.length - 1)) : t;
 
-        let reach = 20; // This determines the maximum distance the character can be moved; default is 20 [TODO]
+        let reach = t.length; // This determines the maximum distance the character can be moved; default is the length of the text
         let fitScores;
 
         switch(c.action) {
@@ -794,11 +1549,6 @@
 
             }
 
-            // console.log("FS");
-            // console.log(fitScores);
-
-            // [TODO] check that deletions + everything else works
-
             // Move the character accordingly:
             c.index += fitScores.transform;
 
@@ -824,7 +1574,7 @@
             }
 
             // Insert the text:
-            setText(document.getElementById("editor"), c.content, { start: c.index, end: c.index }, true);
+            setText(document.getElementById(c.vertex), c.content, { start: c.index, end: c.index }, true);
 
             // Set the caret to its new position (but only if element is focused):
             // if (caretPos)
@@ -911,7 +1661,7 @@
             }
 
             // Remove the text:
-            setText(document.getElementById("editor"), "", { start: c.index, end: c.index + 1 }, true);
+            setText(document.getElementById(c.vertex), "", { start: c.index, end: c.index + 1 }, true);
 
             // Set the caret to its new position (but only if element is focused):
             // if (caretPos)
@@ -998,7 +1748,7 @@
             }
 
             // Insert the text:
-            setText(document.getElementById("editor"), c.content, { start: c.index, end: c.index }, true);
+            setText(document.getElementById(c.vertex), c.content, { start: c.index, end: c.index }, true);
 
             // Set the caret to its new position (but only if element is focused):
             // if (caretPos)
@@ -1099,7 +1849,7 @@
             // Dealing with pending text could be implemented here, but it's a hassle
 
             // Remove the text:
-            setText(document.getElementById("editor"), c.content, { start: c.index.start, end: c.index.end }, true);
+            setText(document.getElementById(c.vertex), c.content, { start: c.index.start, end: c.index.end }, true);
 
             // Set the caret to its new position (but only if element is focused):
             // if (caretPos)
@@ -1108,7 +1858,7 @@
           case "style":
             // Transform the positions:
             for (let i = 0; i < pending.length; i++) {
-              // The pending text comes before the index where the text is to be replaced; therefore, move the style to be inserted over
+              // The pending text comes before the index where the text is to be styled; therefore, move the style to be inserted over
               if (pending[i].action === "type" && pending[i].index <= c.index.start) {
                 c.index.start++;
               }
@@ -1171,15 +1921,86 @@
             c.index.end += fitScores.transform;
 
             // Style the text:
-            let addStyle = c.content.substring(0, 1) === "-" ? false : true;
+            let addStyle = c.content[0] === "-" ? false : true;
             let style = addStyle ? c.content : c.content.substring(1);
-            applyStyle(document.getElementById("editor"), style, { start: c.index.start, end: c.index.end }, addStyle);
+            applyStyle(document.getElementById(c.vertex), style, { start: c.index.start, end: c.index.end }, addStyle);
+          break;
+          case "-link":
+          case "link":
+            // Transform the positions:
+            for (let i = 0; i < pending.length; i++) {
+              // The pending text comes before the index where the text is to be linked; therefore, move the link to be inserted over
+              if (pending[i].action === "type" && pending[i].index <= c.index.start) {
+                c.index.start++;
+              }
+              if (pending[i].action === "type" && pending[i].index <= c.index.end) {
+                c.index.end++;
+              }
+              if (pending[i].action === "delete" && pending[i].index <= c.index.start) {
+                c.index.start--;
+              }
+              if (pending[i].action === "delete" && pending[i].index <= c.index.end) {
+                c.index.end--;
+              }
+              if (pending[i].action === "insert" && pending[i].index <= c.index.start) {
+                c.index.start += pending[i].content.length;
+              }
+              if (pending[i].action === "insert" && pending[i].index <= c.index.end) {
+                c.index.end += pending[i].content.length;
+              }
+              // Replacing could be implemented here, but it's quite the hassle
+            }
 
-            // Set the caret to its new position (but only if element is focused):
-            // if (caretPos)
-            //   setCaretPosition(document.getElementById("editor"), caretPos);
+            // Check if the text to be linked fits here or not:
+            fitScores = {
+              before: {
+                scores: [],
+                max: -1
+              }, // Check the character before, at, and after the 0 index; score the "at" position based on that. This process will be repeated in the for loop down below.
+              at: (((c.index.start - 1 >= 0 ? t[c.index.start - 1] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start, c.index.end) === c.contentPre) ? 3 : 0) + (((c.index.end < t.length ? t[c.index.end] : false) === c.surrounding.after) ? 1 : 0),
+              after: {
+                scores: [],
+                max: -1
+              },
+              transform: 0
+            };
+
+            // Check how good of a fit styling the character before and after within a certain reach would be:
+            for (let i = 1; i < reach + 1; i++) {
+              fitScores.before.scores.push((((c.index.start - 1 - i >= 0 ? t[c.index.start - 1 - i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start - i, c.index.end - i) === c.contentPre) ? 3 : 0) + (((c.index.end - i < t.length ? t[c.index.end - i] : false) === c.surrounding.after) ? 1 : 0));
+              fitScores.after.scores.push((((c.index.start - 1 + i < t.length ? t[c.index.start - 1 + i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start + i, c.index.end + i) === c.contentPre) ? 3 : 0) + (((c.index.end + i < t.length ? t[c.index.end + i] : false) === c.surrounding.after) ? 1 : 0));
+            }
+
+            // Determine the ideal scores for moving the text to be linked before / after:
+            fitScores.before.max = Math.max(...fitScores.before.scores);
+            fitScores.after.max = Math.max(...fitScores.after.scores);
+
+            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
+            if (fitScores.at !== 5 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
+              // If it's better to remove the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be removed):
+              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
+                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
+
+              // If it's better to remove the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
+              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
+                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
+
+            }
+
+            // Move the link accordingly:
+            c.index.start += fitScores.transform;
+            c.index.end += fitScores.transform;
+
+            // Link the text:
+            let addLink = c.action[0] === "-" ? false : true;
+            applyLink(document.getElementById(c.vertex), c.content, { start: c.index.start, end: c.index.end }, addLink, false);
           break;
         }
+
+        // Update cursor position in Firebase (after event finishes):
+        setTimeout(function() {
+          set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.getElementById(c.vertex)));
+        }, 0);
       }
 
       async function getData(path, err) {
@@ -1200,8 +2021,14 @@
         return data;
       }
 
-      function buffer(data) {
-        pending.push(data);
+      function buffer(c, isUndoRedo) {
+        pending.push(c);
+
+        // Handle the undo/redo stack:
+        if (!isUndoRedo) {
+          stack.undo.push(c);
+          stack.redo = [];
+        }
       }
 
       function getCaretPosition(el) {
@@ -1233,8 +2060,8 @@
 
       function setCaretPosition(el, pos) {
 
-        // If no element is focused, return:
-        if (!el.childNodes[0])
+        // If the element is not the currently focused element, ignore this attempt to set the caret position:
+        if (el !== document.activeElement)
           return;
 
         // Create a new selection range:
@@ -1248,6 +2075,53 @@
         // Apple the selection range:
         sel.removeAllRanges();
         sel.addRange(range);
+
+      }
+
+      function getSelectionPosition(pos) {
+
+        if (!document.activeElement)
+          return;
+
+        // Get the spans:
+        let spans = document.activeElement.childNodes;
+
+        // Determine the bounding box of all of the spans:
+        let selectionPos = {
+          x: {
+            min: Infinity,
+            max: 0
+          },
+          y: {
+            min: Infinity,
+            max: 0
+          }
+        };
+
+        // Handle if only 1 character is selected:
+        if (pos.start === pos.end) {
+          pos.start--;
+          pos.end++;
+        }
+
+        let rect;
+        for (let i = Math.max(pos.start, 0); i < Math.min(pos.end, spans.length); i++) {
+
+          rect = spans[i].getBoundingClientRect();
+
+          selectionPos.x.min = Math.min(selectionPos.x.min, rect.left);
+          selectionPos.x.max = Math.max(selectionPos.x.max, rect.right);
+          selectionPos.y.min = Math.min(selectionPos.y.min, rect.top);
+          selectionPos.y.max = Math.max(selectionPos.y.max, rect.bottom);
+        }
+
+        // Return said bounding box:
+        return {
+          x: selectionPos.x.min,
+          y: selectionPos.y.min,
+          w: selectionPos.x.max - selectionPos.x.min,
+          h: selectionPos.y.max - selectionPos.y.min
+        };
 
       }
 
@@ -1294,6 +2168,10 @@
           quicksort(arr, lo, p - 1, by);
           quicksort(arr, p + 1, hi, by);
         }
+      }
+
+      function copyObj(obj) {
+        return JSON.parse(JSON.stringify(obj));
       }
 
     </script>
