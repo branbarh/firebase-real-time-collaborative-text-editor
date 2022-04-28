@@ -6,17 +6,11 @@ To try the live demo, check out https://simplexshotz.github.io/firebase-real-tim
 All code is free to use.
 
 The editor supports:
- - Theoretically Infinite Users (the free Firebase plan is limited to 100 simeltaneous connections, however)
- - Typing / Deleting (even while selecting text)
- - Cutting / Pasting
- - Line Breaks
+ - Infinite Simultaneously Connected Users
+ - Typing, Deleting, Copying, Cutting, Pasting, Inserting Text, etc.
  - Adding Styles (including bold, italic, underline, and strikethrough)
  - Smart Syncing (clients will almost always be viewing the exact same text)
  - Links
- - Custom Undo/Redo Stack
+ - Custom Global Undo/Redo Stack
  - Activity Status
-
-Coming Soon:
  - Realtime Cursors
- - Ctrl + Backspace/Delete Support
- - Full Support for Multiple Vertexes (text fields)
