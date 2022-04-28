@@ -6,7 +6,7 @@
     <style>
 
       *::selection, .selected {
-        background-color: rgb(180, 225, 255);
+        background-color: #0C9DFF50; /* Same as rgb(180, 225, 255) but with an alpha value of 0.31 */
       }
       body {
         display: flex;
@@ -57,10 +57,17 @@
         transition: box-shadow 0.25s;
         margin: 0px 5px;
         text-align: center;
+        transition: box-shadow 0.25s;
       }
       .button:hover {
         cursor: pointer;
         box-shadow: 0px 0px 10px rgb(200, 200, 200);
+      }
+      .button-active {
+        box-shadow: 0px 0px 10px rgb(50, 150, 225);
+      }
+      .button-active:hover {
+        box-shadow: 0px 0px 10px rgb(25, 125, 200);
       }
       .bold {
         font-weight: bold;
@@ -84,7 +91,7 @@
       .link-creator {
         display: flex;
         background-color: rgb(255, 255, 255);
-        width: 260px;
+        width: 360px;
         padding: 20px;
         border-radius: 10px;
         box-shadow: 0px 0px 10px rgb(225, 225, 225);
@@ -100,16 +107,16 @@
       .link-creator-input:focus {
         outline: none;
       }
-      .link-creator-cancel {
+      .link-creator-preview, .link-creator-cancel {
         margin-right: 10px;
       }
-      .link-creator-cancel, .link-creator-confirm {
+      .link-creator-preview, .link-creator-cancel, .link-creator-confirm {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
       }
-      .link-creator-cancel:hover, .link-creator-confirm:hover {
+      .link-creator-preview:hover, .link-creator-cancel:hover, .link-creator-confirm:hover {
         cursor: pointer;
       }
 
@@ -127,6 +134,17 @@
         transition: box-shadow 0.25s;
         text-align: center;
       }
+
+      @keyframes blink {
+        to {
+          border-left: 2px solid rgba(0, 0, 0, 0);
+        }
+      }
+      @-webkit-keyframes blink {
+        to {
+          border-left: 2px solid rgba(0, 0, 0, 0);
+        }
+      }
     </style>
   </head>
   <body>
@@ -135,59 +153,79 @@
     <div class="users">Active: ... &nbsp&nbsp|&nbsp&nbsp Idle: ...</div>
     <script type="module">
 
-      // Things to make this even better:
-      // [DONE!!] Send data regarding the key that comes before/after it; this can then be used to error check and correctly position keys when pressed at the exact same time
-      // [DONE!!] Maximize the conditions met by checking the score if positioned one char to the right, or one char to the left (having the letters on both sides of the char to insert [2/2] is ideal; otherwise, shoot for [1/2]; if [0/0], leave the char where it is)
-      // [DONE!!] ALSO: periodically (not very often, however) pull the ACTUAl content stored in Firebase(?) perhaps only do this on blur and focus(?) ===> update the text region periodically, assuming that it is not currently being focused (elm !== document.activeElement)
+      /*
 
-      /* also to implement:
+      Things to make this even better:
 
-      [NOTE/TODO] pay attention to NOTEs and TODOs!!!
+        [DONE!!] Send data regarding the key that comes before/after it; this can then be used to error check and correctly position keys when pressed at the exact same time
+        [DONE!!] Maximize the conditions met by checking the score if positioned one char to the right, or one char to the left (having the letters on both sides of the char to insert [2/2] is ideal; otherwise, shoot for [1/2]; if [0/0], leave the char where it is)
+        [DONE!!] ALSO: periodically (not very often, however) pull the ACTUAl content stored in Firebase(?) perhaps only do this on blur and focus(?) ===> update the text region periodically, assuming that it is not currently being focused (elm !== document.activeElement)
+
+      also to implement:
+
+      [NOTE] pay attention to [NOTE]s!!!
+
+        [NOTE] check for document.activeElement or document.activeElement.id checks; these need to ensure that activeElement is a valid vertex
 
             - [DONE!!] deleting
                 ([DONE!!]including deleting selections of text)
             - [DONE!!] pasting
             - [DONE!!]  selecting text and then typing/pasting/etc. (perhaps handle these events (selecting text + whatever else) separately?)
 
-        [DONE!!]: spaces (when typed) are not treated as char 160 on the client's end (e.preventDefault() is needed??) [FIXED BY CHANGING ALL TO SPACES]
+        [DONE!!] spaces (when typed) are not treated as char 160 on the client's end (e.preventDefault() is needed??) [FIXED BY CHANGING ALL TO SPACES]
 
-        [CANCELED]: sync in the background when not focused (ignore changes, basically)
-        [DONE!!]: periodically check sync(?)
+        [CANCELED] sync in the background when not focused (ignore changes, basically)
+        [DONE!!] periodically check sync(?)
         [DONE!! IMPORTANT] ==> remove old "changes" ( > 10 mins old (?)) [remove them if all users have updated to them; check the lastUpdated timestamp in user data and if all are > timestamp for change, delete it]
 
-        [TODO]: display cursor positions + selections => USE SPANS!!!
+        [DONE!!] display cursor positions + selections => USE SPANS!!!
+        [DONE!!] update cursors on sync
+        [DONE!!] store cursor positions locally + update them whenever something is typed/changes come in (maybe)
+        [DONE!!] don't update a user's cursor unless it has changed
+        [DONE!!] figure out why sync will randomly go off sometimes??
+        [DONE!!] if content is synced too many times within a short time frame, assume that something went wrong and kick the client, reloading the page
+        [DONE!!] figure out why the editor doesn't like "ß"
+        [DONE!!] figure out why undoing/redoing certain things (such as typing) only has a FitScore of 4 ??? (should be 5)
+        [DONE!!] test new FitScore implementation
+        [DONE!!] whenever cursor is changed, update user.changed; then, only update the cursor position if the "user.changed" value has been updated + the other pre-existing if-check is met
+        [DONE!!] when typing fast at the same pos as other user's cursor, they desync
 
-        [DONE!!]: check styling on syncing
+        [TODO] handle Chromebook grammar checker???
+        [TODO] TEST TEST TEST!!!
+
+        [DONE!!] check styling on syncing
 
         [DONE!!] status sometimes not pushed to firebase??? (might be bc laptop fell asleep + ondisconnect was called; see if theres a reconnect function or smth??)
 
-        [DONE!!]: bold, italics, underlining
-        [DONE!!]: strikethrough
-        [DONE!!]: links!! :D
-        [DONE!!]: implement links themselves
-        [DONE!!]: send link changes
-        [DONE!!]: store links in Firebase
-        [DONE!!]: sync if links are not synced up properly
-        [DONE!!]: undo/redo links
+        [DONE!!] bold, italics, underlining
+        [DONE!!] strikethrough
+        [DONE!!] links!! :D
+        [DONE!!] implement links themselves
+        [DONE!!] send link changes
+        [DONE!!] store links in Firebase
+        [DONE!!] sync if links are not synced up properly
+        [DONE!!] undo/redo links
+        [DONE!!] only apply link styling if typing within a link; check the space to the right as well; if typing directly after a link, the styling should not be applied
+        [DONE!!] add a button to open links
 
-        [DONE!!]: \n sometimes changes to \r (???? might've been bc i was screwing around with cursor stuff... might not be an issue but still test anyway)
-        [DONE!! (MIGHT BE FIXED??)]: sometimes when one person is typing and the other is typing / deletes, their cursor will jump to the start of the doc which is kinda annoying
-        [DONE!!]: if text is selected (ctrl + a) and end of selection is end of doc, and someone types something, keep end of selection at end of doc
-        [DONE!!]: handle ctrl + x
-        [DONE!!]: disable ctrl + delete
-        [TODO (MAYBE??)] implement custom ctrl + delete (replace until previous space with "" [nothing] - note that if character immediately before cursor is a space, that space should be ignored and deleted as well as the rest of the text content, like normal ctrl + delete)
-        [DONE!!]: enters at bottom of doc don't show up until after syncing (sometimes) + sometimes things show up on the wrong bottom line (oof)
-        [DONE!!]: pasting in content with line breaks does not work properly (yikes)
+        [DONE!!] \n sometimes changes to \r (???? might've been bc i was screwing around with cursor stuff... might not be an issue but still test anyway)
+        [DONE!! (MIGHT BE FIXED??)] sometimes when one person is typing and the other is typing / deletes, their cursor will jump to the start of the doc which is kinda annoying
+        [DONE!!] if text is selected (ctrl + a) and end of selection is end of doc, and someone types something, keep end of selection at end of doc
+        [DONE!!] handle ctrl + x
+        [DONE!!] disable ctrl + delete
+        [DONE!!] implement custom ctrl + delete (replace until previous space with "" [nothing] - note that if character immediately before cursor is a space, that space should be ignored and deleted as well as the rest of the text content, like normal ctrl + delete)
+        [DONE!!] enters at bottom of doc don't show up until after syncing (sometimes) + sometimes things show up on the wrong bottom line (oof)
+        [DONE!!] pasting in content with line breaks does not work properly (yikes)
 
         [DONE!!] before and after checking should stop at index -1 (or -2 idk) or at the end of the text content; otherwise, you might get false positives which is not ideal
 
-        [DONE!!]: HANDLE dragging + dropping text???
+        [DONE!!] HANDLE dragging + dropping text???
         [DONE!!] HANDLE CTRL + Z (should be disabled if multiple editors at same time; or immediate sync(?) assuming client is up-to-date)
 
         [NOTE] TO TEST: try out multiple docs!! the code should be setup for it already, just need to change depending on what div is focused :)
 
         [DONE!!] replacing formatted text should copy that text's formatting (first char? idk check what docs does)
-        [TODO] clicking "bold" or "italic" or "underline" should store those values in some variable + apply styles when key is pressed; wipe if arrow key or mouse is clicked
+        [DONE!!] clicking "bold" or "italic" or "underline" should store those values in some variable + apply styles when key is pressed; wipe if arrow key or mouse is clicked
         [DONE!!] ctrl + b should bold, ctrl + i should italic, etc.
         [DONE!!] send style updates to firebase
         [DONE!!] store styling in firebase somewhere
@@ -196,15 +234,15 @@
         [DONE!!] moving text around still doesn't work (insertFromDrop) [I THINK I FIXED IT??? TEST THIS AND ALSO TEST WHEN EVERYONE IS ABLE TO MOVE STUFF AROUND]
         [DONE!!] Get spell corrections working!
         [DONE!!] Deny emojis
+
+        [DONE!!] handle errors when not focused on anything and a change is sent
       */
 
-      // [DONE!!] handle errors when not focused on anything and a change is sent
-
-      // Import the needed functions from the SDKs
+      // Import Firebase modules:
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-app.js";
       import { getDatabase, set, get, ref, query, onValue, child, push, remove, onDisconnect } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
 
-      // Your web app's Firebase configuration
+      // Firebase configuration:
       const firebaseConfig = {
         apiKey: "AIzaSyDChSvCEHSlLxpl-oKr21_kjT3Z_1f-2Nw",
         authDomain: "realtime-editor-testing.firebaseapp.com",
@@ -222,17 +260,21 @@
       let applied = [];
       let uid = "User" + getTime().toString() + Math.floor(Math.random() * Math.pow(10, 5)).toString();
       let lastKeyPress;
+      let lastChange;
+      let lastUpdated;
       let prevContentUpdated = 0;
       let contentCheck = 0;
       let lastInputTimeStamp = 0;
       let activeVertex = false;
-      let userIsAlone = false;
       let stack = {
         undo: [],
         redo: []
       };
+      let userCache = {};
+      let activeStyles = [];
 
       let contentCheckDelay = 5;
+      let syncCount = 0;
 
       window.addEventListener("load", async function() {
 
@@ -241,9 +283,11 @@
 
         // Get the stored text for the editor:
         let content = (await getData("vertexes/editor/content", function(err) { console.error(err); })) || { vertex: "editor", text: "\n", style: { bold: "", italic: "", underline: "", strikethrough: "" }, uid: "", updated: 0 };
+        let userData = (await getData("users", function(err) { console.error(err); })) || {};
         setText(document.getElementById("editor"), content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
         setStyle(document.getElementById("editor"), content.style);
         setLinks(document.getElementById("editor"), content.links);
+        setCursors(userData);
 
         // Update the "applied" values:
         let changesObj = await getData("changes", function(err) { console.error(err); });
@@ -264,28 +308,22 @@
         onValue(ref(db, "users"), (snapshot) => {
           const userData = snapshot.val();
 
-          if (!uid)
+          if (uid === "_disconnected")
             return;
 
           // Check for disconnects:
           if (!userData || !userData[uid] || !userData[uid].status) {
-            uid = "";
-            alert("You have been disconnected from Firebase. Reloading...");
+            uid = "_disconnected";
+            alert("You have been disconnected from the server.\n\nIf this is a recurring issue, there might be something wrong with the editor's content or your internet connection."); // [NOTE]
             location.reload(true);
             return;
           }
 
-          // Determine if the user is the only one editing the current vertex:
-          let alone = true;
-          for (let u in userData) {
-            if (u !== uid && userData[u].vertex === activeVertex) {
-              alone = false;
-              break;
-            }
+          // Remove disconnected user data:
+          if (userData["_disconnected"]) {
+            remove(ref(db, `users/_disconnected`));
+            delete userData["_disconnected"];
           }
-          userIsAlone = alone;
-
-          // console.log(userIsAlone);
 
           // Update user status:
           let statusData = {
@@ -298,6 +336,9 @@
 
           document.getElementsByClassName("users")[0].innerHTML = `Active: ${statusData.active} &nbsp&nbsp|&nbsp&nbsp Idle: ${statusData.idle}`;
 
+          // Update cursor positions:
+          setCursors(userData);
+
         });
 
         // Get new changes coming in:
@@ -306,18 +347,11 @@
           checkForChanges(changes);
         });
 
-        // Check to ensure the clients are all synced properly:
-        onValue(ref(db, "vertexes/editor/content"), (snapshot) => {
-
-          const content = snapshot.val() || { vertex: "editor", text: "\n", style: { bold: "", italic: "", underline: "", strikethrough: "" }, uid: "", updated: 0 };
-          sync(content);
-        });
-
-        // Also check syncing periodically:
+        // Check periodically to ensure the clients are all synced properly:
         setInterval(async function() {
 
           let content = (await getData("vertexes/editor/content", function(err) { console.error(err); })) || { vertex: "editor", text: "\n", style: { bold: "", italic: "", underline: "", strikethrough: "" }, uid: "", updated: 0 };
-          sync(content);
+          sync(document.getElementById("editor"), content);
         }, 250);
 
         // Check for idle users and remove disconnected users:
@@ -343,7 +377,7 @@
         }, 5 * 1000);
       });
 
-      function sync(content) {
+      async function sync(el, content) {
 
         // Ignore if the update is old:
         if (content.updated >= prevContentUpdated) {
@@ -352,33 +386,91 @@
           return;
         }
 
+        // Don't sync while applying changes:
+        if (getTime() - lastChange <= 1000)
+          return;
+
+        // Don't sync while the user is typing:
+        if (getTime() - lastKeyPress <= 1000)
+          return;
+
         // Ignore if the update was by the same user:
         if (content.uid === uid)
           return;
 
-        // Not synced! If this continues for 5 more loops (1.25 seconds), sync up the client:
-        if (content.text !== document.getElementById("editor").textContent || content.style.bold !== ([...document.getElementById("editor").childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join("")) || content.style.italic !== ([...document.getElementById("editor").childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join("")) || content.style.underline !== ([...document.getElementById("editor").childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join("")) || content.style.strikethrough !== ([...document.getElementById("editor").childNodes].map(el => el.classList.contains("strikethrough") ? "X" : "_").slice(0, -1).join("")) || JSON.stringify(content.links) !== JSON.stringify([...document.getElementById("editor").childNodes].map(el => el.dataset.href || "").slice(0, -1))) {
+        // Check if the client is synced (this checks the text, styling, and links):
+        if (content.text !== el.textContent || content.style.bold !== getMeta(el, "bold") || content.style.italic !== getMeta(el, "italic") || content.style.underline !== getMeta(el, "underline") || content.style.strikethrough !== getMeta(el, "strikethrough") || JSON.stringify(content.links) !== JSON.stringify(getMeta(el, "links"))) {
 
+          // Client is not synced; take note of this:
           contentCheck++;
 
+          // If the client is not synced for 5 times in total (~1.25 seconds), sync them:
           if (contentCheck >= contentCheckDelay) {
 
-            if (getTime() - lastKeyPress <= 1000)
-              return;
+            console.warn("Sync");
 
+            // Store the caret position to perserve it for later:
             let caretPos = getCaretPosition(document.getElementById("editor"));
 
+            // Grab user data to sync cursors:
+            let userData = (await getData("users", function(err) { console.error(err); })) || {};
+
+            // Sync everything:
             document.getElementById("editor").textContent = "";
-            setText(document.getElementById("editor"), content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
-            setStyle(document.getElementById("editor"), content.style);
-            setLinks(document.getElementById("editor"), content.links);
-            setCaretPosition(document.getElementById("editor"), caretPos);
+            setText(el, content.text + (content.text[content.text.length - 1] !== "\n" ? "\n" : ""), { start: 0, end: 0 }, true);
+            setStyle(el, content.style);
+            setLinks(el, content.links);
+            setCursors(userData);
+            setCaretPosition(el, caretPos);
 
             contentCheck = 0;
+            syncCount++;
+
+            // Disconnect the user if sync is unable to fix the issue:
+            if (syncCount >= 10)
+              remove(ref(db, `users/${uid}`));
           }
 
+        // Client is synced; reset the counter:
         } else {
           contentCheck = 0;
+          syncCount = 0;
+        }
+      }
+
+      function setButtons() {
+
+        // Reset active classes:
+        while (document.getElementsByClassName("button-active").length > 0)
+          document.getElementsByClassName("button-active")[0].classList.remove("button-active");
+
+        // Add the classes back to any active styles:
+        for (let i = 0; i < activeStyles.length; i++) {
+          document.getElementById(activeStyles[i]).classList.add("button-active");
+        }
+      }
+
+      function getActiveStyles(el) {
+
+        let caretPos = getCaretPosition(el);
+
+        // Determine what the current active styles should be:
+        // No text is selected; get the style of the character before:
+        if (caretPos.start === caretPos.end) {
+          return (el.childNodes[caretPos.start - 1] && el.childNodes[caretPos.start - 1].classList) ? [...el.childNodes[caretPos.start - 1].classList].filter(cl => (cl.indexOf("cursor") === -1 && cl.indexOf("link") === -1 && cl.indexOf("selected") === -1)) : [];
+
+        // Text is being selected; get the styles that apply to all characters in the selection:
+        } else {
+
+          // Get the styles of the first character in the selection:
+          let styles = (el.childNodes[caretPos.start] && el.childNodes[caretPos.start].classList) ? [...el.childNodes[caretPos.start].classList].filter(cl => (cl.indexOf("cursor") === -1 && cl.indexOf("link") === -1 && cl.indexOf("selected") === -1)) : [];
+
+          // Remove the style if it doesn't apply to all of the characters in the selection:
+          for (let i = caretPos.start + 1; i < caretPos.end; i++) {
+            let indexedStyles = (el.childNodes[i] && el.childNodes[i].classList) ? [...el.childNodes[i].classList].filter(cl => (cl.indexOf("cursor") === -1 && cl.indexOf("link") === -1 && cl.indexOf("selected") === -1)) : [];
+            styles = styles.filter(cl => indexedStyles.indexOf(cl) !== -1);
+          }
+          return styles;
         }
       }
 
@@ -387,6 +479,15 @@
         // Update cursor position in Firebase (after event finishes):
         setTimeout(function() {
           set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.getElementById("editor")));
+
+          // Handle arrow keys and "Ctrl + A":
+          if (e.keyCode === 37 || e.keyCode === 38 || e.keyCode === 39 || e.keyCode === 40 || (e.ctrlKey && e.keyCode === 65)) {
+            activeStyles = getActiveStyles(document.getElementById("editor"));
+            setButtons();
+
+            set(ref(db, `users/${uid}/changed`), getTime());
+            set(ref(db, `users/${uid}/status`), "active");
+          }
         }, 0);
 
         // Close the link creator:
@@ -396,7 +497,6 @@
         clearSelections();
 
         // Prevent defualt behavior of most keys (alpha-numerical, delete/backspace, undo/redo, styling keys):
-        // Note that this disables the use of ctrl + backspace/delete; this is done on purpose since its behavior is sometimes hard to predict (especially with special characters)
         if ((!e.ctrlKey && e.key.length === 1) || (e.keyCode === 8 || e.keyCode === 46 || e.keyCode === 13) || (e.ctrlKey && (e.keyCode === 90 || e.keyCode === 89 || e.keyCode === 66 || e.keyCode === 73 || e.keyCode === 85 || e.keyCode === 83 || e.keyCode === 75)))
           e.preventDefault();
 
@@ -407,36 +507,86 @@
         if (e.keyCode === 13)
           key = "\n";
 
-        // console.log("B/T ||| " + (this.textContent[caretPos.end - 1] || false) + " ||| " + (key || e.key));
-
         // Handle backspace / delete:
-        if (e.keyCode === 8 && caretPos.end > 0 || e.keyCode === 46 && caretPos.end < this.textContent.length) {
+        if (e.keyCode === 8 && caretPos.end > 0 || e.keyCode === 46 && caretPos.end < this.textContent.length - 1) {
+
           // No selection:
           if (caretPos.start === caretPos.end) {
-            buffer({
-              vertex: "editor",
-              uid: uid,
-              timestamp: getTime(),
-              action: "delete",
-              contentPre: this.textContent[caretPos.end - (e.keyCode === 8 ? 1 : 0)],
-              index: caretPos.end - (e.keyCode === 8 ? 1 : 0),
-              surrounding: {
-                before: this.textContent[caretPos.end - 1 - (e.keyCode === 8 ? 1 : 0)] || false,
-                after: ((caretPos.end + (e.keyCode === 46 ? 1 : 0)) === this.textContent.length - 1 && this.textContent[caretPos.end + (e.keyCode === 46 ? 1 : 0)] === "\n") ? false : (this.textContent[caretPos.end + (e.keyCode === 46 ? 1 : 0)] || false)
+
+            // Handle normal backspace / delete:
+            if (!e.ctrlKey) {
+
+              // Update active styles:
+              activeStyles = (this.childNodes[caretPos.start - (e.keyCode === 8 ? 1 : 0)] && this.childNodes[caretPos.start - (e.keyCode === 8 ? 1 : 0)].classList) ? [...this.childNodes[caretPos.start - (e.keyCode === 8 ? 1 : 0)].classList].filter(cl => (cl.indexOf("cursor") === -1 && cl.indexOf("link") === -1 && cl.indexOf("selected") === -1)) : [];
+              setButtons();
+
+              buffer({
+                vertex: "editor",
+                action: "delete",
+                contentPre: this.textContent[caretPos.start - (e.keyCode === 8 ? 1 : 0)],
+                index: {
+                  start: caretPos.start - (e.keyCode === 8 ? 1 : 0),
+                  end: caretPos.start - (e.keyCode === 8 ? 1 : 0)
+                },
+                surrounding: {
+                  before: this.textContent[caretPos.start - 1 - (e.keyCode === 8 ? 1 : 0)] || false,
+                  after: ((caretPos.start + (e.keyCode === 46 ? 1 : 0)) === this.textContent.length - 1 && this.textContent[caretPos.start + (e.keyCode === 46 ? 1 : 0)] === "\n") ? false : (this.textContent[caretPos.start + (e.keyCode === 46 ? 1 : 0)] || false)
+                }
+              });
+
+              lastKeyPress = getTime();
+              attemptToPushChanges(lastKeyPress);
+
+              setText(this, "", { start: caretPos.start - (e.keyCode === 8 ? 1 : 0), end: caretPos.end + (e.keyCode === 46 ? 1 : 0) });
+
+            // Handle Ctrl + Backspace / Delete:
+            } else {
+
+              // Determine what index to delete up to:
+              let breakCharacters = " `~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?\n".split("");
+              let initialIndex = caretPos.start + (this.textContent[caretPos.start + (e.keyCode === 8 ? -1 : 0)] === " " ? (e.keyCode === 8 ? -2 : 2) : (e.keyCode === 8 ? -1 : 1));
+              let i = initialIndex;
+              while (i > 0 && i < this.textContent.length - 1 && (breakCharacters.indexOf(this.textContent[i + (e.keyCode === 8 ? -1 : 0)]) === -1 && breakCharacters.indexOf(this.textContent[i + (e.keyCode === 8 ? 0 : -1)]) === -1 || breakCharacters.indexOf(this.textContent[i + (e.keyCode === 8 ? 0 : -1)]) !== -1 && breakCharacters.indexOf(this.textContent[i + (e.keyCode === 8 ? -1 : 0)]) !== -1)) {
+                i += (e.keyCode === 8 ? -1 : 1);
               }
-            });
 
-            lastKeyPress = getTime();
-            attemptToPushChanges(lastKeyPress);
+              // Update active styles:
+              activeStyles = (this.childNodes[i] && this.childNodes[i].classList) ? [...this.childNodes[i].classList].filter(cl => (cl.indexOf("cursor") === -1 && cl.indexOf("link") === -1 && cl.indexOf("selected") === -1)) : [];
+              setButtons();
 
-            setText(this, "", { start: caretPos.end - 1, end: caretPos.end });
+              let start = Math.min(caretPos.start, i);
+              let end = Math.max(caretPos.start, i);
 
+              buffer({
+                vertex: "editor",
+                action: "replace",
+                contentPre: this.textContent.substring(start, end),
+                content: "",
+                index: {
+                  start: start,
+                  end: end
+                },
+                surrounding: {
+                  before: this.textContent[start - 1] || false,
+                  after: (end === this.textContent.length - 1 && this.textContent[end] === "\n") ? false : (this.textContent[end] || false)
+                }
+              });
+
+              lastKeyPress = getTime();
+              attemptToPushChanges(lastKeyPress);
+
+              setText(this, "", { start: start, end: end });
+
+            }
           // Selection:
           } else {
+
+            // Update active styles:
+            activeStyles = (this.childNodes[caretPos.start] && this.childNodes[caretPos.start].classList) ? [...this.childNodes[caretPos.start].classList].filter(cl => (cl.indexOf("cursor") === -1 && cl.indexOf("link") === -1 && cl.indexOf("selected") === -1)) : [];
+            setButtons();
+
             buffer({
               vertex: "editor",
-              uid: uid,
-              timestamp: getTime(),
               action: "replace",
               contentPre: this.textContent.substring(caretPos.start, caretPos.end),
               content: "",
@@ -458,51 +608,95 @@
         }
 
         // Handle undo/redo:
-        if (e.ctrlKey && !e.shiftKey && e.keyCode === 90 && stack.undo.length > 0) { // Ctrl + Z (Undo)
+        // Ctrl + Z (Undo):
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 90 && stack.undo.length > 0) {
           execUndo();
         }
-        if ((e.ctrlKey && e.shiftKey && e.keyCode === 90 || e.ctrlKey && e.keyCode === 89) && stack.redo.length > 0) { // Ctrl + Shift + Z or Ctrl + y (Redo)
+
+        // Ctrl + Shift + Z or Ctrl + Y (Redo):
+        if ((e.ctrlKey && e.shiftKey && e.keyCode === 90 || e.ctrlKey && e.keyCode === 89) && stack.redo.length > 0) {
           execRedo();
         }
 
         // Handle styling keys and link keys:
-        if (e.ctrlKey && !e.shiftKey && e.keyCode === 66) { // Ctrl + B (Bold)
+        // Ctrl + B (Bold):
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 66) {
+
+          // No text is selected:
           if (caretPos.start === caretPos.end) {
+            if (activeStyles.indexOf("bold") === -1) {
+              activeStyles.push("bold");
+            } else {
+              activeStyles.splice(activeStyles.indexOf("bold"), 1);
+            }
 
-            // [TODO] handle when nothing is selected
+            setButtons();
 
+          // Text is selected:
           } else {
             applyStyle(document.getElementById("editor"), "bold");
           }
         }
-        if (e.ctrlKey && !e.shiftKey && e.keyCode === 73) { // Ctrl + I (Italic)
+
+        // Ctrl + I (Italic):
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 73) {
+
+          // No text is selected:
           if (caretPos.start === caretPos.end) {
+            if (activeStyles.indexOf("italic") === -1) {
+              activeStyles.push("italic");
+            } else {
+              activeStyles.splice(activeStyles.indexOf("italic"), 1);
+            }
 
-            // [TODO] handle when nothing is selected
+            setButtons();
 
+          // Text is selected:
           } else {
             applyStyle(document.getElementById("editor"), "italic");
           }
         }
-        if (e.ctrlKey && !e.shiftKey && e.keyCode === 85) { // Ctrl + U (underline)
+
+        // Ctrl + U (Underline):
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 85) {
+
+          // No text is selected:
           if (caretPos.start === caretPos.end) {
+            if (activeStyles.indexOf("underline") === -1) {
+              activeStyles.push("underline");
+            } else {
+              activeStyles.splice(activeStyles.indexOf("underline"), 1);
+            }
 
-            // [TODO] handle when nothing is selected
+            setButtons();
 
+          // Text is selected:
           } else {
             applyStyle(document.getElementById("editor"), "underline");
           }
         }
-        if (e.ctrlKey && !e.shiftKey && e.keyCode === 83) { // Ctrl + S (Strikethrough)
+
+        // Ctrl + S (Strikethrough):
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 83) {
+
+          // No text is selected:
           if (caretPos.start === caretPos.end) {
+            if (activeStyles.indexOf("strikethrough") === -1) {
+              activeStyles.push("strikethrough");
+            } else {
+              activeStyles.splice(activeStyles.indexOf("strikethrough"), 1);
+            }
 
-            // [TODO] handle when nothing is selected
+            setButtons();
 
+          // Text is selected:
           } else {
             applyStyle(document.getElementById("editor"), "strikethrough");
           }
         }
-        if (e.ctrlKey && !e.shiftKey && e.keyCode === 75) { // Ctrl + K (Link)
+
+        // Ctrl + K (Link):
+        if (e.ctrlKey && !e.shiftKey && e.keyCode === 75) {
           if (caretPos.start !== caretPos.end) {
             createLink(this);
           }
@@ -516,11 +710,12 @@
         if (caretPos.start === caretPos.end) {
           buffer({
             vertex: "editor",
-            uid: uid,
-            timestamp: getTime(),
             action: "type",
             content: key || e.key,
-            index: caretPos.end,
+            index: {
+              start: caretPos.end,
+              end: caretPos.end
+            },
             surrounding: {
               before: this.textContent[caretPos.end - 1] || false, // The first part of this conditional is to ignore the last "\n" that HTML sometimes autofills (for whatever reason):
               after: (caretPos.end === this.textContent.length - 1 && this.textContent[caretPos.end] === "\n") ? false : (this.textContent[caretPos.end] || false)
@@ -532,8 +727,6 @@
         } else {
           buffer({
             vertex: "editor",
-            uid: uid,
-            timestamp: getTime(),
             action: "replace",
             contentPre: this.textContent.substring(caretPos.start, caretPos.end),
             content: key || e.key,
@@ -562,7 +755,7 @@
           set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.getElementById("editor")));
         }, 0);
 
-        // Undo was due to insertFromDrop and should be ignored:
+        // Input was due to a recursive call from insertFromDrop, insertReplacementText, or insertCompositionText and should be ignored:
         if (Math.abs(lastInputTimeStamp - e.timeStamp) <= 1000 || lastInputTimeStamp === Infinity) {
           return;
         }
@@ -597,11 +790,12 @@
 
           buffer({
             vertex: "editor",
-            uid: uid,
-            timestamp: getTime(),
             action: "insert",
             content: this.textContent.substring(insertCaretPos.start, insertCaretPos.end),
-            index: insertCaretPos.start,
+            index: {
+              start: insertCaretPos.start,
+              end: insertCaretPos.start
+            },
             surrounding: {
               before: this.textContent[insertCaretPos.start - 1] || false,
               after: (insertCaretPos.end === this.textContent.length - 1 && this.textContent[insertCaretPos.end] === "\n") ? false : (this.textContent[insertCaretPos.end] || false)
@@ -621,8 +815,6 @@
 
             buffer({
               vertex: "editor",
-              uid: uid,
-              timestamp: getTime(),
               action: "replace",
               contentPre: this.textContent.substring(preCaretPos.start, preCaretPos.end),
               content: "",
@@ -656,6 +848,7 @@
           // The original text is now selected:
           let preCaretPos = getCaretPosition(this);
           let contentPre = this.textContent.substring(preCaretPos.start, preCaretPos.end);
+          let classes = (this.childNodes[preCaretPos.start] && this.childNodes[preCaretPos.start].classList) ? [...this.childNodes[preCaretPos.start].classList].filter(cl => (cl.indexOf("cursor") === -1 && cl.indexOf("link") === -1 && cl.indexOf("selected") === -1)) : [];
 
           // Then, redo the spelling correction (to determine the new text):
           lastInputTimeStamp = e.timeStamp;
@@ -667,8 +860,6 @@
 
           buffer({
             vertex: "editor",
-            uid: uid,
-            timestamp: getTime(),
             action: "replace",
             contentPre: contentPre,
             content: content,
@@ -678,11 +869,11 @@
             },
             surrounding: {
               before: this.textContent[preCaretPos.start - 1] || false,
-              after: (preCaretPos.end === this.textContent.length - 1 && this.textContent[preCaretPos.end] === "\n") ? false : (this.textContent[preCaretPos.end] || false)
+              after: (postCaretPos.end === this.textContent.length - 1 && this.textContent[postCaretPos.end] === "\n") ? false : (this.textContent[postCaretPos.end] || false)
             }
           });
 
-          setText(this, content, { start: preCaretPos.start, end: preCaretPos.start + 1 });
+          setText(this, content, { start: preCaretPos.start, end: preCaretPos.start + 1 }, false, classes);
 
           lastKeyPress = getTime();
           attemptToPushChanges(lastKeyPress);
@@ -713,22 +904,23 @@
 
         let caretPos = getCaretPosition(this);
 
-        // Clean pasted text
+        // Clean pasted text:
         e.preventDefault();
         let textToPaste = (e.clipboardData.getData("text/plain")).split("\r\n").join("\n");
 
-        // Push pasted text
+        // Push pasted text:
         if (caretPos.start === caretPos.end) {
           buffer({
             vertex: "editor",
-            uid: uid,
-            timestamp: getTime(),
             action: "insert",
             content: textToPaste,
-            index: caretPos.end,
+            index: {
+              start: caretPos.end,
+              end: caretPos.end
+            },
             surrounding: {
               before: this.textContent[caretPos.end - 1] || false,
-              after: this.textContent[caretPos.end] || false
+              after: (caretPos.end === this.textContent.length - 1 && this.textContent[caretPos.end] === "\n") ? false : (this.textContent[caretPos.end] || false)
             }
           });
 
@@ -737,8 +929,6 @@
         } else {
           buffer({
             vertex: "editor",
-            uid: uid,
-            timestamp: getTime(),
             action: "replace",
             contentPre: this.textContent.substring(caretPos.start, caretPos.end),
             content: textToPaste,
@@ -748,7 +938,7 @@
             },
             surrounding: {
               before: this.textContent[caretPos.start - 1] || false,
-              after: this.textContent[caretPos.end] || false
+              after: (caretPos.end === this.textContent.length - 1 && this.textContent[caretPos.end] === "\n") ? false : (this.textContent[caretPos.end] || false)
             }
           });
 
@@ -770,14 +960,12 @@
 
         let caretPos = getCaretPosition(this);
 
-        // Push removed text
+        // Push removed text:
         if (caretPos.start === caretPos.end)
           return;
 
         buffer({
           vertex: "editor",
-          uid: uid,
-          timestamp: getTime(),
           action: "replace",
           contentPre: this.textContent.substring(caretPos.start, caretPos.end),
           content: "",
@@ -787,7 +975,7 @@
           },
           surrounding: {
             before: this.textContent[caretPos.start - 1] || false,
-            after: this.textContent[caretPos.end] || false // [TODO] update all of these to check for the \n text node~
+            after: (caretPos.end === this.textContent.length - 1 && this.textContent[caretPos.end] === "\n") ? false : (this.textContent[caretPos.end] || false)
           }
         });
 
@@ -802,17 +990,25 @@
         activeVertex = "editor";
         setTimeout(function() {
           set(ref(db, `users/${uid}/cursor`), getCaretPosition(this));
+          set(ref(db, `users/${uid}/vertex`), "editor");
+          set(ref(db, `users/${uid}/changed`), getTime());
+          set(ref(db, `users/${uid}/status`), "active");
         }, 0);
-        set(ref(db, `users/${uid}/vertex`), "editor");
 
       });
 
       document.getElementById("editor").addEventListener("blur", function(e) {
 
         // Remove this from being the active vertex:
-        activeVertex = false;
-        set(ref(db, `users/${uid}/cursor`), false);
-        set(ref(db, `users/${uid}/vertex`), false);
+        setTimeout(function() {
+          if (!document.activeElement.classList.contains("link-creator-element")) {
+            activeVertex = false;
+            set(ref(db, `users/${uid}/cursor`), false);
+            set(ref(db, `users/${uid}/vertex`), false);
+            set(ref(db, `users/${uid}/changed`), getTime());
+            set(ref(db, `users/${uid}/status`), "active");
+          }
+        }, 0);
 
       });
 
@@ -826,12 +1022,16 @@
           clearSelections();
         }
 
+        let preCaretPos = document.activeElement.id ? getCaretPosition(document.activeElement) : false; // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+        let preVertex = document.activeElement.id || false; // [NOTE]
+
         // Check for links and update cursor position in Firebase (after event finishes):
         setTimeout(function() {
 
-          let caretPos = document.activeElement.id ? getCaretPosition(document.activeElement) : false; // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
-
+          // Ensure that a valid vertex was clicked on:
           if (document.activeElement.id) { // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+
+            let caretPos = document.activeElement.id ? getCaretPosition(document.activeElement) : false; // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
 
             // Check if the element clicked is a link:
             if (caretPos.start === caretPos.end && document.activeElement.childNodes[caretPos.end].dataset.href) { // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
@@ -853,31 +1053,88 @@
               createLink(document.activeElement, document.activeElement.childNodes[caretPos.end].dataset.href);
             }
 
+            if (preCaretPos.start !== caretPos.start || preCaretPos.end !== caretPos.end || preVertex !== document.activeElement.id) {
+              activeStyles = getActiveStyles(document.activeElement);
+              setButtons();
+            }
+
             // Update cursor position in Firebase:
             set(ref(db, `users/${uid}/cursor`), caretPos);
+            set(ref(db, `users/${uid}/changed`), getTime());
+            set(ref(db, `users/${uid}/status`), "active");
+          } else {
+            activeStyles = [];
+          }
+        }, 0);
+
+      });
+      let updateCursorThrottled = throttle(function() {
+        if (!document.activeElement.id || document.activeElement.classList.contains("link-creator-element"))
+          return;
+
+        set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.activeElement));
+        set(ref(db, `users/${uid}/changed`), getTime());
+        set(ref(db, `users/${uid}/status`), "active");
+      }, 100);
+      document.body.addEventListener("mousemove", function(e) {
+
+        let preCaretPos = document.activeElement.id ? getCaretPosition(document.activeElement) : false; // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+        let preVertex = document.activeElement.id || false; // [NOTE]
+
+        // Update cursor position in Firebase (after event finishes):
+        setTimeout(function() {
+
+          // Ensure that a valid vertex was clicked on:
+          if (e.buttons === 1 && document.activeElement.id && !document.activeElement.classList.contains("link-creator-element")) { // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+
+            let caretPos = document.activeElement.id ? getCaretPosition(document.activeElement) : false; // [NOTE]
+
+            // Update active styles:
+            if (preCaretPos.start !== caretPos.start || preCaretPos.end !== caretPos.end || preVertex !== document.activeElement.id) {
+              activeStyles = getActiveStyles(document.activeElement);
+              setButtons();
+            }
+
+            // Update cursor position (throttled so it doesn't send too many updates to Firebase at once):
+            updateCursorThrottled();
           }
         }, 0);
 
       });
       document.body.addEventListener("mouseup", function() {
 
+        let preCaretPos = document.activeElement.id ? getCaretPosition(document.activeElement) : false; // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+        let preVertex = document.activeElement.id || false; // [NOTE]
+
         // Update cursor position in Firebase (after event finishes):
         setTimeout(function() {
-          if (document.activeElement.id) { // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+
+          // Ensure that a valid vertex was clicked on:
+          if (document.activeElement.id && !document.activeElement.classList.contains("link-creator-element")) { // [NOTE] when implementing into actual editor, additional id checks will need to be made (to ensure it is a valid vertex field)
+
+            let caretPos = document.activeElement.id ? getCaretPosition(document.activeElement) : false; // [NOTE]
+
+            if (preCaretPos.start !== caretPos.start || preCaretPos.end !== caretPos.end || preVertex !== document.activeElement.id) {
+              activeStyles = getActiveStyles(document.activeElement);
+              setButtons();
+            }
+
             set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.activeElement));
+            set(ref(db, `users/${uid}/changed`), getTime());
+            set(ref(db, `users/${uid}/status`), "active");
           }
         }, 0);
 
       });
 
-      function setText(el, text, pos, ignoreCursor, style, href) {
+      function setText(el, text, pos, ignoreCursor, classes, href) {
 
         // There was a text selection that is being overridden; remove the text being overridden:
         if (pos.start !== pos.end) {
 
-          // Use the styling and href of the first element if text is being overridden:
-          style = el.childNodes[pos.start] ? (el.childNodes[pos.start].classList ? ((pos.start >= 0 && el.childNodes[pos.start].classList.value) ? ` class="${el.childNodes[pos.start].classList.value.split("selected").join("")}"` : "") : ` class=""` /* < Element is a text DOM element */) : "";
-          href = el.childNodes[pos.start] ? (el.childNodes[pos.start].dataset ? ((pos.start >= 0 && el.childNodes[pos.start].dataset.href) ? ` data-href="${el.childNodes[pos.start].dataset.href}"` : "") : ` data-href=""` /* < Element is a text DOM element */) : "";
+          // Use the classes (for styling) and href of the first element if text is being overridden:
+          classes = classes ? classes : (el.childNodes[pos.start] && el.childNodes[pos.start].classList) ? [...el.childNodes[pos.start].classList].filter(cl => (cl.indexOf("cursor") === -1 && cl.indexOf("link") === -1 && cl.indexOf("selected") === -1)) : [];
+          href = el.childNodes[pos.start] ? (el.childNodes[pos.start].dataset ? ((pos.start >= 0 && el.childNodes[pos.start].dataset.href !== undefined) ? ` data-href="${el.childNodes[pos.start].dataset.href}"` : "") : "" /* < Element is a text DOM element */) : "";
 
           // Remove the text being overridden:
           for (let i = pos.end - 1; i >= pos.start; i--) {
@@ -893,7 +1150,7 @@
         // If the text to be inserted contains multiple characters, use a recursive call to add them one at a time (in order):
         if (text.length > 1) {
           for (let i = 0; i < text.length; i++) {
-            setText(el, text[i], { start: pos.start + i, end: pos.start + i }, true, style, href);
+            setText(el, text[i], { start: pos.start + i, end: pos.start + i }, true, classes, href);
           }
 
           if (!ignoreCursor)
@@ -902,12 +1159,28 @@
           return;
         }
 
-        // Only 1 character is to be added; get the styles and append the element to the editor:
-        let classList = style ? style : (el.childNodes[pos.start - 1] ? ((pos.start - 1 >= 0 && el.childNodes[pos.start - 1].classList.value) ? ` class="${el.childNodes[pos.start - 1].classList.value}"` : "") : "");
-        let hrefData = href ? href : (el.childNodes[pos.start - 1] ? ((pos.start - 1 >= 0 && el.childNodes[pos.start - 1].dataset.href) ? ` data-href="${el.childNodes[pos.start - 1].dataset.href}"` : "") : "");
+        // Only 1 character is to be added; get the classes (for styling) and the href:
+        let classList = classes ? classes : activeStyles;
+        if (el.childNodes[pos.start - 1] && el.childNodes[pos.start] && el.childNodes[pos.start - 1].classList && el.childNodes[pos.start - 1].classList.contains("link") && el.childNodes[pos.start - 1].dataset.href === el.childNodes[pos.start].dataset.href)
+          classList.push("link");
 
+        // Add cursor selection classes if text is being added in the middle of another user's selection:
+        if (el.childNodes[pos.start - 1] && el.childNodes[pos.start - 1].classList && el.childNodes[pos.start] && el.childNodes[pos.start].classList) {
+          let cursorSelectionsBefore = [...el.childNodes[pos.start - 1].classList].filter(cl => cl.indexOf("cursor-selection") !== -1);
+          let cursorSelectionsAfter = [...el.childNodes[pos.start].classList].filter(cl => cl.indexOf("cursor-selection") !== -1);
+
+          for (let i = 0; i < cursorSelectionsBefore.length; i++) {
+            if (cursorSelectionsAfter.indexOf(cursorSelectionsBefore[i]) !== -1)
+              classList.push(cursorSelectionsBefore[i]);
+          }
+        }
+        let classText = classList.length > 0 ? ` class="${classList.join(" ")}"`: "";
+
+        let hrefData = href ? href : (el.childNodes[pos.start - 1] && el.childNodes[pos.start] ? ((pos.start - 1 >= 0 && el.childNodes[pos.start - 1].dataset.href !== undefined && el.childNodes[pos.start - 1].dataset.href === el.childNodes[pos.start].dataset.href) ? ` data-href="${el.childNodes[pos.start - 1].dataset.href}"` : "") : "");
+
+        // Append the element to the editor:
         let span = document.createElement("div");
-        span.innerHTML = `<span${classList}${hrefData}>${text}</span>`;
+        span.innerHTML = `<span${classText}${hrefData}>${text}</span>`;
         if (pos === el.textContent.length) {
           el.appendChild(span.childNodes[0]);
         } else {
@@ -920,22 +1193,184 @@
 
       }
 
+      function setCursors(users) {
+
+        // Check if a user has disconnected:
+        for (let u in userCache) {
+
+          // This user no longer exists in Firebase; user has disconnected:
+          if (!users[u]) {
+
+            // Delete the user from the cache:
+            delete userCache[u];
+
+            // Remove the user's cursor:
+            while (document.getElementsByClassName(`cursor_${u}`).length > 0)
+              document.getElementsByClassName(`cursor_${u}`)[0].classList.remove(`cursor_${u}`);
+
+            while (document.getElementsByClassName(`cursor-selection_${u}`).length > 0)
+              document.getElementsByClassName(`cursor-selection_${u}`)[0].classList.remove(`cursor-selection_${u}`);
+          }
+        }
+
+        // Check if a user has joined:
+        for (let u in users) {
+
+          // This user did not previously exist in cache; this is a new user:
+          if (!userCache[u]) {
+
+            userCache[u] = users[u];
+            userCache[u].newUser = true;
+
+            // Set cursor styles:
+            setCSSStyle(`cursor_${u}`, `border-left: 2px solid ${stringToColor(u)}; margin-left: -2px; animation: blink 1.06s steps(2, start) infinite; -webkit-animation: blink 1.06s steps(2, start) infinite;`);
+            setCSSStyle(`cursor-selection_${u}`, `background-color: ${stringToColor(u)}50;`);
+          }
+        }
+
+        for (let u in users) {
+
+          // Skip self:
+          if (u === uid)
+            continue;
+
+          // Check if the user's cursor has not moved; if so, there is no need to update it:
+          let currentCursorPos = users[u].vertex ? [...document.getElementById(users[u].vertex).childNodes].indexOf(document.getElementsByClassName(`cursor_${u}`)[0]) : false;
+
+          // Update the cursor if the user is a new user, they have made a change of some sort (including have moved their cursor), or if the cursor is in the wrong position:
+          if (!userCache[u].newUser && JSON.stringify(users[u].changed) === JSON.stringify(userCache[u].changed) && ((!users[u].vertex || !users[u].cursor) || (users[u].cursor.start !== users[u].cursor.end) || (!users[uid] || users[u].updated < lastUpdated || users[u].cursor.start === currentCursorPos))) {
+            userCache[u] = users[u];
+            continue;
+          }
+
+          // Update the user cache:
+          userCache[u] = users[u];
+
+          // Clear previous cursor/cursor selection:
+          while (document.getElementsByClassName(`cursor_${u}`).length > 0)
+            document.getElementsByClassName(`cursor_${u}`)[0].classList.remove(`cursor_${u}`);
+
+          while (document.getElementsByClassName(`cursor-selection_${u}`).length > 0)
+            document.getElementsByClassName(`cursor-selection_${u}`)[0].classList.remove(`cursor-selection_${u}`);
+
+          // Don't apply cursors if this user is not currently editing a vertex:
+          if (!users[u].vertex || !users[u].cursor)
+            continue;
+
+          // Add new cursor/cursor selection:
+          let spans = document.getElementById(users[u].vertex).childNodes;
+
+          // User has a cursor but does not have a selection; add cursor:
+          if (users[u].cursor.start === users[u].cursor.end) {
+
+            if (spans[users[u].cursor.start])
+              spans[users[u].cursor.start].classList.add(`cursor_${u}`);
+
+          // User has a selection; add cursor selection:
+          } else {
+
+            for (let i = users[u].cursor.start; i < users[u].cursor.end; i++) {
+              if (spans[i])
+                spans[i].classList.add(`cursor-selection_${u}`);
+            }
+
+          }
+        }
+
+      }
+
+      function setCSSStyle(clas, style) {
+
+        let rules = document.styleSheets[0].cssRules;
+
+        // Change the rule if it already exists:
+        for (let i = 0; i < rules.length; i++) {
+          if (rules[i].selectorText === `.${clas}`) {
+            rules[i].style = style;
+            return;
+          }
+        }
+
+        // Insert new rule if it doesn't already exist:
+        document.styleSheets[0].insertRule(`.${clas} { ${style} }`, 0);
+      }
+
       // Styling and Link button event handlers:
       document.getElementById("bold").addEventListener("mousedown", function(e) {
         e.preventDefault();
-        applyStyle(document.getElementById("editor"), "bold");
+
+        if (!document.activeElement.id)
+          return;
+
+        let caretPos = getCaretPosition(document.activeElement);
+        if (caretPos.start === caretPos.end) {
+          if (activeStyles.indexOf("bold") === -1) {
+            activeStyles.push("bold");
+          } else {
+            activeStyles.splice(activeStyles.indexOf("bold"), 1);
+          }
+
+          setButtons();
+        } else {
+          applyStyle(document.activeElement, "bold");
+        }
       });
       document.getElementById("italic").addEventListener("mousedown", function(e) {
         e.preventDefault();
-        applyStyle(document.getElementById("editor"), "italic");
+
+        if (!document.activeElement.id)
+          return;
+
+        let caretPos = getCaretPosition(document.activeElement);
+        if (caretPos.start === caretPos.end) {
+          if (activeStyles.indexOf("italic") === -1) {
+            activeStyles.push("italic");
+          } else {
+            activeStyles.splice(activeStyles.indexOf("italic"), 1);
+          }
+
+          setButtons();
+        } else {
+          applyStyle(document.activeElement, "italic");
+        }
       });
       document.getElementById("underline").addEventListener("mousedown", function(e) {
         e.preventDefault();
-        applyStyle(document.getElementById("editor"), "underline");
+
+        if (!document.activeElement.id)
+          return;
+
+        let caretPos = getCaretPosition(document.activeElement);
+        if (caretPos.start === caretPos.end) {
+          if (activeStyles.indexOf("underline") === -1) {
+            activeStyles.push("underline");
+          } else {
+            activeStyles.splice(activeStyles.indexOf("underline"), 1);
+          }
+
+          setButtons();
+        } else {
+          applyStyle(document.activeElement, "underline");
+        }
       });
       document.getElementById("strikethrough").addEventListener("mousedown", function(e) {
         e.preventDefault();
-        applyStyle(document.getElementById("editor"), "strikethrough");
+
+        if (!document.activeElement.id)
+          return;
+
+        let caretPos = getCaretPosition(document.activeElement);
+        if (caretPos.start === caretPos.end) {
+          if (activeStyles.indexOf("strikethrough") === -1) {
+            activeStyles.push("strikethrough");
+          } else {
+            activeStyles.splice(activeStyles.indexOf("strikethrough"), 1);
+          }
+
+          setButtons();
+        } else {
+          applyStyle(document.activeElement, "strikethrough");
+        }
       });
       document.getElementById("link").addEventListener("mousedown", function(e) {
         e.preventDefault();
@@ -990,14 +1425,20 @@
           }
         }
 
-        // If no pos is passed in, assume that this was a local change
+        // If no pos is passed in, assume that this was a local change:
         if (localChange) {
+
+          // Update the active styling:
+          setTimeout(function() {
+            if (document.activeElement.id) { // [NOTE]
+              activeStyles = getActiveStyles(document.activeElement);
+              setButtons();
+            }
+          }, 0);
 
           // Push changes:
           buffer({
             vertex: "editor",
-            uid: uid,
-            timestamp: getTime(),
             action: "style",
             contentPre: el.textContent.substring(pos.start, pos.end),
             content: (addStyle ? "" : "-") + style,
@@ -1007,7 +1448,7 @@
             },
             surrounding: {
               before: el.textContent[pos.start - 1] || false,
-              after: el.textContent[pos.end] || false
+              after: (pos.end === el.textContent.length - 1 && el.textContent[pos.end] === "\n") ? false : (el.textContent[pos.end] || false)
             }
           });
 
@@ -1034,15 +1475,22 @@
         for (let i = caretPos.start; i < caretPos.end; i++) {
           spans[i].classList.add("selected");
         }
+        setTimeout(function() {
+          set(ref(db, `users/${uid}/vertex`), el.id);
+          set(ref(db, `users/${uid}/cursor`), caretPos);
+        }, 0);
 
         // Get the position of the selected text on the display:
         let selectionPos = getSelectionPosition(caretPos);
 
         // Create the div to insert a link:
         let div = document.createElement("div");
-        div.innerHTML = `<div class="link-creator link-creator-element" style="position: absolute; left: calc(${selectionPos.x + selectionPos.w / 2}px - 150px); top: calc(${selectionPos.y + selectionPos.h}px + 20px);">
+        div.innerHTML = `<div class="link-creator link-creator-element" style="position: absolute; left: calc(${selectionPos.x + selectionPos.w / 2}px - 200px); top: calc(${selectionPos.y + selectionPos.h}px + 20px);">
           <div class="link-creator-input link-creator-element" contenteditable="true">
             ${link || ""}
+          </div>
+          <div class="link-creator-preview link-creator-element">
+            <img src="./resources/icons/editor/preview.svg" class="link-creator-element">
           </div>
           <div class="link-creator-cancel link-creator-element">
             <img src="./resources/icons/close.svg" class="link-creator-element">
@@ -1053,7 +1501,7 @@
         </div>`;
 
         // Display it to the user:
-        document.body.appendChild(div.childNodes[0]);
+        document.body.appendChild(div.childNodes[0]); // [NOTE] when implementing into the actual editor, make sure that the link creator is fixed to the editor element itself, so it doesn't move if the page is scrolled
 
         // Focus the input and add event listeners:
         let linkCreator = document.getElementsByClassName("link-creator")[document.getElementsByClassName("link-creator").length - 1];
@@ -1068,6 +1516,11 @@
           document.execCommand("insertHTML", false, textToPaste);
         });
 
+        // Preview button:
+        linkCreator.getElementsByClassName("link-creator-preview")[0].addEventListener("click", function() {
+          window.open(linkCreator.getElementsByClassName("link-creator-input")[0].textContent.trim(), "_blank");
+        });
+
         // Close button:
         linkCreator.getElementsByClassName("link-creator-cancel")[0].addEventListener("click", function() {
           applyLink(el, el.childNodes[caretPos.start].dataset.href, caretPos, false, true);
@@ -1080,7 +1533,7 @@
         // Confirm button:
         linkCreator.getElementsByClassName("link-creator-confirm")[0].addEventListener("click", function() {
           if (linkCreator.getElementsByClassName("link-creator-input")[0].textContent.trim() !== "")
-            applyLink(el, linkCreator.getElementsByClassName("link-creator-input")[0].textContent, caretPos, true, true);
+            applyLink(el, linkCreator.getElementsByClassName("link-creator-input")[0].textContent.trim(), caretPos, true, true);
           linkCreator.remove();
           clearSelections();
           el.focus();
@@ -1092,7 +1545,7 @@
           if (e.keyCode === 13) {
             e.preventDefault();
             if (linkCreator.getElementsByClassName("link-creator-input")[0].textContent.trim() !== "")
-              applyLink(el, linkCreator.getElementsByClassName("link-creator-input")[0].textContent, caretPos, true, true);
+              applyLink(el, linkCreator.getElementsByClassName("link-creator-input")[0].textContent.trim(), caretPos, true, true);
             linkCreator.remove();
             clearSelections();
             el.focus();
@@ -1111,9 +1564,9 @@
       function setLinks(el, links) {
 
         // Override all links with the passed in "links":
-        for (let i = 0; i < links.length; i++) {
+        for (let i in links) {
           if (links[i]) {
-            applyLink(el, links[i], { start: i, end: i + 1 }, true, false);
+            applyLink(el, links[i], { start: Number(i), end: Number(i) + 1 }, true, false);
           }
         }
       }
@@ -1126,24 +1579,22 @@
         if (!pos)
           pos = getCaretPosition(el);
 
-        // If no pos is passed in, assume that this was a local change
+        // If no pos is passed in, assume that this was a local change:
         if (localChange) {
 
           // Push changes:
           buffer({
             vertex: "editor",
-            uid: uid,
-            timestamp: getTime(),
             action: addLink ? "link" : "-link",
             contentPre: el.textContent.substring(pos.start, pos.end),
-            content: link,
+            content: link || "",
             index: {
               start: pos.start,
               end: pos.end
             },
             surrounding: {
               before: el.textContent[pos.start - 1] || false,
-              after: el.textContent[pos.end] || false
+              after: (pos.end === el.textContent.length - 1 && el.textContent[pos.end] === "\n") ? false : (el.textContent[pos.end] || false)
             }
           });
 
@@ -1175,10 +1626,13 @@
               action: "delete",
               contentPre: c.content,
               undo: buf,
-              index: c.index,
+              index: {
+                start: c.index.start,
+                end: c.index.end
+              },
               surrounding: {
-                before: document.getElementById(c.vertex).textContent[c.index - 1] || false,
-                after: (c.index + 1 === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index + 1] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index + 1] || false)
+                before: document.getElementById(c.vertex).textContent[c.index.start - 1] || false,
+                after: (c.index.start + 1 === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index.start + 1] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index.start + 1] || false)
               }
             };
           break;
@@ -1190,10 +1644,13 @@
               action: "type",
               content: c.contentPre,
               undo: buf,
-              index: c.index,
+              index: {
+                start: c.index.start,
+                end: c.index.end
+              },
               surrounding: {
-                before: document.getElementById(c.vertex).textContent[c.index - 1] || false, // The first part of this conditional is to ignore the last "\n" that HTML sometimes autofills (for whatever reason):
-                after: (c.index === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index] || false)
+                before: document.getElementById(c.vertex).textContent[c.index.start - 1] || false, // The first part of this conditional is to ignore the last "\n" that HTML sometimes autofills (for whatever reason):
+                after: (c.index.start === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index.start] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index.start] || false)
               }
             };
           break;
@@ -1207,12 +1664,12 @@
               content: "",
               undo: buf,
               index: {
-                start: c.index,
-                end: c.index + c.content.length
+                start: c.index.start,
+                end: c.index.end + c.content.length
               },
               surrounding: {
-                before: document.getElementById(c.vertex).textContent[c.index - 1] || false,
-                after: document.getElementById(c.vertex).textContent[c.index + c.content.length] || false
+                before: document.getElementById(c.vertex).textContent[c.index.start - 1] || false,
+                after: (c.index.start + c.content.length === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index.start + c.content.length] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index.start + c.content.length] || false)
               }
             };
           break;
@@ -1231,7 +1688,7 @@
               },
               surrounding: {
                 before: document.getElementById(c.vertex).textContent[c.index.start - 1] || false,
-                after: document.getElementById(c.vertex).textContent[c.index.start + c.content.length] || false
+                after: (c.index.start + c.content.length === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index.start + c.content.length] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index.start + c.content.length] || false)
               }
             };
           break;
@@ -1250,7 +1707,7 @@
               },
               surrounding: {
                 before: document.getElementById(c.vertex).textContent[c.index.start - 1] || false,
-                after: document.getElementById(c.vertex).textContent[c.index.end] || false
+                after: (c.index.end === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index.end] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index.end] || false)
               }
             };
           break;
@@ -1270,7 +1727,7 @@
               },
               surrounding: {
                 before: document.getElementById(c.vertex).textContent[c.index.start - 1] || false,
-                after: document.getElementById(c.vertex).textContent[c.index.end] || false
+                after: (c.index.end === document.getElementById(c.vertex).textContent.length - 1 && document.getElementById(c.vertex).textContent[c.index.end] === "\n") ? false : (document.getElementById(c.vertex).textContent[c.index.end] || false)
               }
             };
           break;
@@ -1280,8 +1737,8 @@
       function execUndo() {
 
         // Undo the change:
-        applyChange(undo(stack.undo[stack.undo.length - 1]), true);
         buffer(undo(stack.undo[stack.undo.length - 1], true), true);
+        applyChange(undo(stack.undo[stack.undo.length - 1]), true);
 
         // Push the undone change to the redo stack:
         stack.redo.push(stack.undo[stack.undo.length - 1]);
@@ -1309,8 +1766,8 @@
       function execRedo() {
 
         // Redo the change:
-        applyChange(stack.redo[stack.redo.length - 1], true);
         buffer(redo(stack.redo[stack.redo.length - 1], true), true);
+        applyChange(stack.redo[stack.redo.length - 1], true);
 
         // Push the undone change to the redo stack:
         stack.undo.push(stack.redo[stack.redo.length - 1]);
@@ -1328,10 +1785,10 @@
         // Check for changes on the server side:
         let changesObj = await getData("changes", function(err) { console.error(err); });
 
-        // This will check for changes and apply them if found; otherwise, the function will return false
+        // This will check for changes and apply them if found; otherwise, the function will return false:
         if (!checkForChanges(changesObj, t)) {
 
-          // No changes to handle; push pending changes
+          // No changes to handle; push pending changes:
           let changedVertexes = [];
 
           if (document.activeElement.id) // [NOTE] when implementing into actual editor, verify that this is an actual vertex
@@ -1347,27 +1804,60 @@
 
           // Update the stored content and the user changed time:
           setTimeout(function() {
+
+            // Ensure that no changes have been made during the 100ms delay:
+            if (getTime() - lastChange < 100)
+              return;
+
             for (let i = 0; i < changedVertexes.length; i++) {
               set(ref(db, `vertexes/${changedVertexes[i]}/content`), {
                 text: document.getElementById(changedVertexes[i]).textContent + (document.getElementById(changedVertexes[i]).textContent[document.getElementById(changedVertexes[i]).textContent.length - 1] !== "\n" ? "\n" : ""),
                 style: {
-                  bold: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join(""),
-                  italic: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join(""),
-                  underline: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join(""),
-                  strikethrough: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.classList.contains("strikethrough") ? "X" : "_").slice(0, -1).join("")
+                  bold: getMeta(document.getElementById(changedVertexes[i]), "bold"),
+                  italic: getMeta(document.getElementById(changedVertexes[i]), "italic"),
+                  underline: getMeta(document.getElementById(changedVertexes[i]), "underline"),
+                  strikethrough: getMeta(document.getElementById(changedVertexes[i]), "strikethrough")
                 },
-                links: [...document.getElementById(changedVertexes[i]).childNodes].map(el => el.dataset.href || "").slice(0, -1),
+                links: getMeta(document.getElementById(changedVertexes[i]), "links"),
                 updated: getTime(),
                 uid: uid
               });
             }
-          }, 0);
-          setTimeout(function() {
+          }, 100);
+          setTimeout(async function() {
             set(ref(db, `users/${uid}/changed`), getTime());
             set(ref(db, `users/${uid}/status`), "active");
           }, 0);
+          setTimeout(async function() {
+
+            // Update the cursor positions:
+            let userData = (await getData("users", function(err) { console.error(err); })) || {};
+            setCursors(userData);
+          }, 250);
         }
 
+      }
+
+      function getMeta(el, type) {
+        switch(type) {
+          case "bold":
+          case "italic":
+          case "underline":
+          case "strikethrough":
+            return [...el.childNodes].map(elm => elm.classList.contains(type) ? "X" : "_").slice(0, -1).join("");
+          break;
+          case "links":
+            let links = [...el.childNodes].map(elm => elm.dataset.href || "").slice(0, -1);
+            let newLinks = {};
+
+            for (let i = 0; i < links.length; i++) {
+              if (links[i])
+                newLinks[i] = links[i]
+            }
+
+            return newLinks;
+          break;
+        }
       }
 
       function checkForChanges(changesObj, t) {
@@ -1380,14 +1870,14 @@
           if (applied.indexOf(i) !== -1)
             continue;
 
-          let changeToPush = JSON.parse(JSON.stringify(changesObj[i]));
+          let changeToPush = copyObj(changesObj[i]);
           changeToPush.key = i;
 
           // Otherwise, we will apply this change:
           changes.push(changeToPush);
         }
 
-        // No changes to be made!
+        // No changes to be made; return:
         if (changes.length === 0)
           return false;
 
@@ -1402,13 +1892,23 @@
           applied.push(changes[i].key);
         }
 
-        // After changes have been applied, update content and last updated date:
+        lastChange = getTime();
+        lastUpdated = changes[changes.length - 1].timestamp;
+
+        // After changes have been applied, update the last updated timestamp for this user and check to see if the change can be removed from Firebase:
         setTimeout(async function() {
           await set(ref(db, `users/${uid}/updated`), changes[changes.length - 1].timestamp);
 
           let users = await getData("users", function(err) { console.error(err); });
           let allChanges = await getData("changes", function(err) { console.error(err); });
 
+          // Determine the most recent change for each vertex:
+          let lastChanges = {};
+          for (let change in allChanges) {
+            lastChanges[allChanges[change].vertex] = change;
+          }
+
+          // Remove changes if all clients have applied them:
           let allUpdated;
           for (let change in allChanges) {
             allUpdated = true;
@@ -1418,29 +1918,39 @@
                 break;
               }
             }
+
             // If all clients have already applied this change, remove it and update the stored content:
             if (allUpdated) {
               remove(ref(db, `changes/${change}`));
 
-              if (allChanges[change].vertex === activeVertex) {
-                set(ref(db, `vertexes/${allChanges[change].vertex}/content`), {
-                  text: document.getElementById(allChanges[change].vertex).textContent + (document.getElementById(allChanges[change].vertex).textContent[document.getElementById(allChanges[change].vertex).textContent.length - 1] !== "\n" ? "\n" : ""),
-                  style: {
-                    bold: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.classList.contains("bold") ? "X" : "_").slice(0, -1).join(""),
-                    italic: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.classList.contains("italic") ? "X" : "_").slice(0, -1).join(""),
-                    underline: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.classList.contains("underline") ? "X" : "_").slice(0, -1).join(""),
-                    strikethrough: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.classList.contains("strikethrough") ? "X" : "_").slice(0, -1).join("")
-                  },
-                  links: [...document.getElementById(allChanges[change].vertex).childNodes].map(el => el.dataset.href || "").slice(0, -1),
-                  updated: getTime(),
-                  uid: uid
-                });
+              // If this is the last change for the currently active vertex, update the content in Firebase:
+              if (change === lastChanges[allChanges[change].vertex] && allChanges[change].vertex === activeVertex) {
+                setTimeout(function() {
+
+                  // Ensure that no changes have been made during the 100ms delay:
+                  if (getTime() - lastChange < 100)
+                    return;
+
+                  // Update the content in Firebase:
+                  set(ref(db, `vertexes/${allChanges[change].vertex}/content`), {
+                    text: document.getElementById(allChanges[change].vertex).textContent + (document.getElementById(allChanges[change].vertex).textContent[document.getElementById(allChanges[change].vertex).textContent.length - 1] !== "\n" ? "\n" : ""),
+                    style: {
+                      bold: getMeta(document.getElementById(allChanges[change].vertex), "bold"),
+                      italic: getMeta(document.getElementById(allChanges[change].vertex), "italic"),
+                      underline: getMeta(document.getElementById(allChanges[change].vertex), "underline"),
+                      strikethrough: getMeta(document.getElementById(allChanges[change].vertex), "strikethrough")
+                    },
+                    links: getMeta(document.getElementById(allChanges[change].vertex), "links"),
+                    updated: getTime(),
+                    uid: uid
+                  });
+                }, 100);
               }
             }
           }
         }, 0);
 
-        // If no pending changes have been made since the last keypress, try again
+        // If no pending changes have been made since the last keypress, try again:
         if (t && t === lastKeyPress) {
           attemptToPushChanges();
         }
@@ -1450,6 +1960,21 @@
       }
 
       function applyChange(c, isUndoRedo) {
+
+        // Store the caret position and text content of the editor:
+        let caretPos = getCaretPosition(c.vertex);
+        let t = document.getElementById(c.vertex).textContent;
+
+        // Remove the "\n" that is always present, but not actually able to be edited:
+        t = (t[t.length - 1] === "\n") ? (t.substring(0, t.length - 1)) : t;
+
+        // Determine if a change should be applied in the location it was intended for, or if it should be moved somewhere else (as it often needs to be if changes were made between the time the other user sent the change and when this client recieved it):
+        // This can be thought of as the "magic function", as it makes the editor MUCH more reliable when multiple people are typing at the same time:
+        let transform = getTransform(c, t);
+
+        // Apply the trasnsform:
+        c.index.start += transform;
+        c.index.end += transform;
 
         if (!isUndoRedo) {
 
@@ -1472,453 +1997,99 @@
           }
         }
 
-        // Store the caret position and text content of the editor:
-        let caretPos = getCaretPosition(c.vertex);
-        let t = document.getElementById(c.vertex).textContent;
-
-        // Remove the "\n" that is always present, but not actually able to be edited:
-        t = (t[t.length - 1] === "\n") ? (t.substring(0, t.length - 1)) : t;
-
-        let reach = t.length; // This determines the maximum distance the character can be moved; default is the length of the text
-        let fitScores;
+        // Transform the change based on the pending changes:
+        for (let i = 0; i < pending.length; i++) {
+          // The pending text comes before the index where the text is to be replaced; therefore, move the text to be inserted over:
+          if (pending[i].action === "type" && pending[i].index <= c.index.start) {
+            c.index.start++;
+          }
+          if (pending[i].action === "type" && pending[i].index <= c.index.end) {
+            c.index.end++;
+          }
+          if (pending[i].action === "delete" && pending[i].index <= c.index.start) {
+            c.index.start--;
+          }
+          if (pending[i].action === "delete" && pending[i].index <= c.index.end) {
+            c.index.end--;
+          }
+          if (pending[i].action === "insert" && pending[i].index <= c.index.start) {
+            c.index.start += pending[i].content.length;
+          }
+          if (pending[i].action === "insert" && pending[i].index <= c.index.end) {
+            c.index.end += pending[i].content.length;
+          }
+          // Replacing could be implemented here, but it's quite the hassle
+        }
 
         switch(c.action) {
           case "type":
-            // Transform the positions:
+
+            // Transform the pending text based on this change:
             for (let i = 0; i < pending.length; i++) {
-              // The pending text comes before the index where the text is to be inserted; therefore, move the text to be inserted over
-              if (pending[i].action === "type" && pending[i].index <= c.index) {
-                c.index++;
-              }
-              if (pending[i].action === "delete" && pending[i].index <= c.index) {
-                c.index--;
-              }
-              if (pending[i].action === "insert" && pending[i].index <= c.index) {
-                c.index += pending[i].content.length;
-              }
-              if (pending[i].action === "replace" && pending[i].index.end <= c.index) {
-                c.index += pending[i].content.length - pending[i].contentPre.length;
-              } else if (pending[i].action === "replace" && pending[i].index.start < c.index) {
-                return; // The text is going to get replaced anyways; return
-              }
-            }
-
-            // console.log(t);
-
-            // Check if the text to be inserted fits here or not:
-            fitScores = {
-              before: {
-                scores: [],
-                max: -1
-              },
-              at: (((c.index - 1 >= 0 ? t[c.index - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index < t.length ? t[c.index] : false) === c.surrounding.after) ? 1 : 0),
-              after: {
-                scores: [],
-                max: -1
-              },
-              transform: 0
-            };
-
-            // Check how good of a fit moving the character before and after within a certain reach would be:
-            for (let i = 1; i < reach + 1; i++) {
-              if (c.index - i >= 0) {
-                fitScores.before.scores.push((((c.index - i - 1 >= 0 ? t[c.index - i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i >= 0 ? t[c.index - i] : false) === c.surrounding.after) ? 1 : 0));
-              } else {
-                fitScores.before.scores.push(0);
-              }
-              if (c.index + i <= t.length) {
-                fitScores.after.scores.push((((c.index + i - 1 < t.length ? t[c.index + i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.after) ? 1 : 0));
-              } else {
-                fitScores.after.scores.push(0);
-              }
-            }
-
-            // Determine the ideal scores for moving the text to be inserted before / after:
-            fitScores.before.max = Math.max(...fitScores.before.scores);
-            fitScores.after.max = Math.max(...fitScores.after.scores);
-
-            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
-            if (fitScores.at !== 2 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
-              // If it's better to place the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be placed):
-              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
-                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
-
-              // If it's better to place the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
-              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
-                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
-
-            }
-
-            // Move the character accordingly:
-            c.index += fitScores.transform;
-
-            // The text to be inserted comes before the caret position; therefore, move the caret position over
-            if (caretPos && c.index <= caretPos.start) {
-              caretPos.start++;
-            }
-            if (caretPos && c.index < caretPos.end) {
-              caretPos.end++;
-            }
-            for (let i = 0; i < pending.length; i++) {
-              // The text to be inserted comes before the pending text; therefore, move the pending text over
+              // The text to be typed comes before the pending text; therefore, move the pending text over:
               if (pending[i].action === "replace") {
-                if (c.index <= pending[i].index.start) {
+                if (c.index.start <= pending[i].index.start) {
                   pending[i].index.start++;
                   pending[i].index.end++;
                 }
                 continue;
               }
-              if (c.index < pending[i].index) {
+              if (c.index.start < pending[i].index) {
                 pending[i].index++;
               }
             }
 
-            // Insert the text:
-            setText(document.getElementById(c.vertex), c.content, { start: c.index, end: c.index }, true);
-
-            // Set the caret to its new position (but only if element is focused):
-            // if (caretPos)
-            //   setCaretPosition(document.getElementById("editor"), caretPos);
+            // Type the text:
+            setText(document.getElementById(c.vertex), c.content, { start: c.index.start, end: c.index.start }, true, c.style);
           break;
           case "delete":
-            // Transform the positions:
+
+            // Transform the pending text based on this change:
             for (let i = 0; i < pending.length; i++) {
-              // The pending text comes before the index where the text is to be removed; therefore, move the text to be inserted over
-              if (pending[i].action === "type" && pending[i].index <= c.index) {
-                c.index++;
-              }
-              if (pending[i].action === "delete" && pending[i].index <= c.index) {
-                c.index--;
-              }
-              if (pending[i].action === "insert" && pending[i].index <= c.index) {
-                c.index += pending[i].content.length;
-              }
-              if (pending[i].action === "replace" && pending[i].index.end <= c.index) {
-                c.index += pending[i].content.length - pending[i].contentPre.length;
-              } else if (pending[i].action === "replace" && pending[i].index.start < c.index) {
-                return; // The text is going to get replaced anyways; return
-              }
-            }
-
-            // Check if the text to be removed fits here or not:
-            fitScores = {
-              before: {
-                scores: [],
-                max: -1
-              }, // Check the character before, at, and after the 0 index; score the "at" position based on that. This process will be repeated in the for loop down below.
-              at: (((c.index - 1 >= 0 ? t[c.index - 1] : false) === c.surrounding.before) ? 1 : 0) + ((t[c.index] === c.contentPre) ? 3 : 0) + (((c.index + 1 < t.length ? t[c.index + 1] : false) === c.surrounding.after) ? 1 : 0),
-              after: {
-                scores: [],
-                max: -1
-              },
-              transform: 0
-            };
-
-            // Check how good of a fit removing the character before and after within a certain reach would be:
-            for (let i = 1; i < reach + 1; i++) {
-              fitScores.before.scores.push((((c.index - i - 1 >= 0 ? t[c.index - i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i > 0 ? t[c.index - i] : false) === c.contentPre) ? 3 : 0) + (((c.index - i + 1 < t.length ? t[c.index - i + 1] : false) === c.surrounding.after) ? 1 : 0));
-              fitScores.after.scores.push((((c.index + i - 1 < t.length ? t[c.index + i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + i < t.length ? t[c.index + i] : false) === c.contentPre) ? 3 : 0) + (((c.index + i + 1 < t.length ? t[c.index + i + 1] : false) === c.surrounding.after) ? 1 : 0));
-            }
-
-            // Determine the ideal scores for moving the text to be removed before / after:
-            fitScores.before.max = Math.max(...fitScores.before.scores);
-            fitScores.after.max = Math.max(...fitScores.after.scores);
-
-            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
-            if (fitScores.at !== 5 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
-              // If it's better to remove the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be removed):
-              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
-                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
-
-              // If it's better to remove the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
-              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
-                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
-
-            }
-
-            // Move the removal accordingly:
-            c.index += fitScores.transform;
-
-            // The text to be removed comes before the caret position; therefore, move the caret position over
-            if (caretPos && c.index < caretPos.start) {
-              caretPos.start--;
-            }
-            if (caretPos && c.index < caretPos.end) {
-              caretPos.end--;
-            }
-            for (let i = 0; i < pending.length; i++) {
-              // The text to be removed comes before the pending text; therefore, move the pending text over
+              // The text to be deleted comes before the pending text; therefore, move the pending text over:
               if (pending[i].action === "replace") {
-                if (c.index <= pending[i].index.start) {
+                if (c.index.start <= pending[i].index.start) {
                   pending[i].index.start--;
                   pending[i].index.end--;
                 }
                 continue;
               }
-              if (c.index < pending[i].index) {
+              if (c.index.start < pending[i].index) {
                 pending[i].index--;
               }
             }
 
-            // Remove the text:
-            setText(document.getElementById(c.vertex), "", { start: c.index, end: c.index + 1 }, true);
-
-            // Set the caret to its new position (but only if element is focused):
-            // if (caretPos)
-            //   setCaretPosition(document.getElementById("editor"), caretPos);
+            // Delete the text:
+            setText(document.getElementById(c.vertex), "", { start: c.index.start, end: c.index.start + 1 }, true, c.style);
           break;
           case "insert":
-            // Transform the positions:
+
+            // Transform the pending text based on this change:
             for (let i = 0; i < pending.length; i++) {
-              // The pending text comes before the index where the text is to be inserted; therefore, move the text to be inserted over
-              if (pending[i].action === "type" && pending[i].index <= c.index) {
-                c.index++;
-              }
-              if (pending[i].action === "delete" && pending[i].index <= c.index) {
-                c.index--;
-              }
-              if (pending[i].action === "insert" && pending[i].index <= c.index) {
-                c.index += pending[i].content.length;
-              }
-              if (pending[i].action === "replace" && pending[i].index.end <= c.index) {
-                c.index += pending[i].content.length - pending[i].contentPre.length;
-              } else if (pending[i].action === "replace" && pending[i].index.start < c.index) {
-                return;  // The text is going to get replaced anyways; return
-              }
-            }
-
-            // Check if the text to be inserted fits here or not:
-            fitScores = {
-              before: {
-                scores: [],
-                max: -1
-              },
-              at: (((c.index - 1 >= 0 ? t[c.index - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index < t.length ? t[c.index] : false) === c.surrounding.after) ? 1 : 0),
-              after: {
-                scores: [],
-                max: -1
-              },
-              transform: 0
-            };
-
-            // Check how good of a fit moving the character before and after within a certain reach would be:
-            for (let i = 1; i < reach + 1; i++) {
-              fitScores.before.scores.push((((c.index - i - 1 >= 0 ? t[c.index - i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index - i >= 0 ? t[c.index - i] : false) === c.surrounding.after) ? 1 : 0));
-              fitScores.after.scores.push((((c.index + i - 1 < t.length ? t[c.index + i - 1] : false) === c.surrounding.before) ? 1 : 0) + (((c.index + i < t.length ? t[c.index + i] : false) === c.surrounding.after) ? 1 : 0));
-            }
-
-            // Determine the ideal scores for moving the text to be inserted before / after:
-            fitScores.before.max = Math.max(...fitScores.before.scores);
-            fitScores.after.max = Math.max(...fitScores.after.scores);
-
-            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
-            if (fitScores.at !== 2 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
-              // If it's better to place the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be placed):
-              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
-                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
-
-              // If it's better to place the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
-              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
-                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
-
-            }
-
-            // Move the character accordingly:
-            c.index += fitScores.transform;
-
-            // The text to be inserted comes before the caret position; therefore, move the caret position over
-            if (caretPos && c.index <= caretPos.start) {
-              caretPos.start += c.content.length;
-            }
-            if (caretPos && c.index < caretPos.end) {
-              caretPos.end += c.content.length;
-            }
-            for (let i = 0; i < pending.length; i++) {
-              // The text to be inserted comes before the pending text; therefore, move the pending text over
+              // The text to be inserted comes before the pending text; therefore, move the pending text over:
               if (pending[i].action === "replace") {
-                if (c.index <= pending[i].index.start) {
+                if (c.index.start <= pending[i].index.start) {
                   pending[i].index.start += c.content.length;
                   pending[i].index.end += c.content.length;
                 }
                 continue;
               }
-              if (c.index < pending[i].index) {
+              if (c.index.start < pending[i].index) {
                 pending[i].index += c.content.length;
               }
             }
 
             // Insert the text:
-            setText(document.getElementById(c.vertex), c.content, { start: c.index, end: c.index }, true);
-
-            // Set the caret to its new position (but only if element is focused):
-            // if (caretPos)
-            //   setCaretPosition(document.getElementById("editor"), caretPos);
+            setText(document.getElementById(c.vertex), c.content, { start: c.index.start, end: c.index.start }, true, c.style);
           break;
           case "replace":
-            // Transform the positions:
-            for (let i = 0; i < pending.length; i++) {
-              // The pending text comes before the index where the text is to be replaced; therefore, move the text to be inserted over
-              if (pending[i].action === "type" && pending[i].index <= c.index.start) {
-                c.index.start++;
-              }
-              if (pending[i].action === "type" && pending[i].index <= c.index.end) {
-                c.index.end++;
-              }
-              if (pending[i].action === "delete" && pending[i].index <= c.index.start) {
-                c.index.start--;
-              }
-              if (pending[i].action === "delete" && pending[i].index <= c.index.end) {
-                c.index.end--;
-              }
-              if (pending[i].action === "insert" && pending[i].index <= c.index.start) {
-                c.index.start += pending[i].content.length;
-              }
-              if (pending[i].action === "insert" && pending[i].index <= c.index.end) {
-                c.index.end += pending[i].content.length;
-              }
-              // Replacing could be implemented here, but it's quite the hassle
-            }
 
-            // Check if the text to be removed fits here or not:
-            fitScores = {
-              before: {
-                scores: [],
-                max: -1
-              }, // Check the character before, at, and after the 0 index; score the "at" position based on that. This process will be repeated in the for loop down below.
-              at: (((c.index.start - 1 >= 0 ? t[c.index.start - 1] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start, c.index.end) === c.contentPre) ? 3 : 0) + (((c.index.end < t.length ? t[c.index.end] : false) === c.surrounding.after) ? 1 : 0),
-              after: {
-                scores: [],
-                max: -1
-              },
-              transform: 0
-            };
+            // Dealing with pending text could be implemented here, but it's a hassle and "getTransform" will usually handle it on the other clients anyway
 
-            // Check how good of a fit removing the character before and after within a certain reach would be:
-            for (let i = 1; i < reach + 1; i++) {
-              fitScores.before.scores.push((((c.index.start - 1 - i >= 0 ? t[c.index.start - 1 - i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start - i, c.index.end - i) === c.contentPre) ? 3 : 0) + (((c.index.end - i < t.length ? t[c.index.end - i] : false) === c.surrounding.after) ? 1 : 0));
-              fitScores.after.scores.push((((c.index.start - 1 + i < t.length ? t[c.index.start - 1 + i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start + i, c.index.end + i) === c.contentPre) ? 3 : 0) + (((c.index.end + i < t.length ? t[c.index.end + i] : false) === c.surrounding.after) ? 1 : 0));
-            }
-
-            // Determine the ideal scores for moving the text to be removed before / after:
-            fitScores.before.max = Math.max(...fitScores.before.scores);
-            fitScores.after.max = Math.max(...fitScores.after.scores);
-
-            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
-            if (fitScores.at !== 5 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
-              // If it's better to remove the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be removed):
-              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
-                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
-
-              // If it's better to remove the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
-              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
-                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
-
-            }
-
-            // Move the removal accordingly:
-            c.index.start += fitScores.transform;
-            c.index.end += fitScores.transform;
-
-            // Deal with the caret positions:
-            // Note that "[ ]" represents the text being replaced; "I I" represents the current selection
-            if (caretPos && c.index.start < caretPos.start && c.index.end <= caretPos.start) {
-              // Text being replaced is entirely before the current selection
-              // [ ] I I
-              caretPos.start += c.content.length - c.contentPre.length;
-              caretPos.end += c.content.length - c.contentPre.length;
-            } else if (caretPos && c.index.start <= caretPos.start && c.index.end > caretPos.start && c.index.end < caretPos.end) {
-              // Text being replaced overlaps the start of the current selection
-              // [ I ] I
-              caretPos.start = c.index.start + c.content.length;
-              caretPos.end += c.content.length - c.contentPre.length;
-            } else if (caretPos && c.index.start > caretPos.start && c.index.start < caretPos.end && c.index.end >= caretPos.end) {
-              // Text being replaced overlaps the end of the current selection
-              // I [ I ]
-              caretPos.end = c.index.start;
-            } else if (caretPos && c.index.start > caretPos.start && c.index.end < caretPos.end) {
-              // Text being replaced is entirely contained within the current selection
-              // I [ ] I
-              caretPos.end += c.content.length - c.contentPre.length;
-            } else if (caretPos && c.index.start <= caretPos.start && c.index.end >= caretPos.end) {
-              // Text being replaced is entirely surrounding the current selection
-              // [ I I ]
-              caretPos.start = c.index.start;
-              caretPos.end = c.index.start;
-            }
-
-            // Dealing with pending text could be implemented here, but it's a hassle
-
-            // Remove the text:
-            setText(document.getElementById(c.vertex), c.content, { start: c.index.start, end: c.index.end }, true);
-
-            // Set the caret to its new position (but only if element is focused):
-            // if (caretPos)
-            //   setCaretPosition(document.getElementById("editor"), caretPos);
+            // Replace the text:
+            setText(document.getElementById(c.vertex), c.content, { start: c.index.start, end: c.index.end }, true, c.style);
           break;
           case "style":
-            // Transform the positions:
-            for (let i = 0; i < pending.length; i++) {
-              // The pending text comes before the index where the text is to be styled; therefore, move the style to be inserted over
-              if (pending[i].action === "type" && pending[i].index <= c.index.start) {
-                c.index.start++;
-              }
-              if (pending[i].action === "type" && pending[i].index <= c.index.end) {
-                c.index.end++;
-              }
-              if (pending[i].action === "delete" && pending[i].index <= c.index.start) {
-                c.index.start--;
-              }
-              if (pending[i].action === "delete" && pending[i].index <= c.index.end) {
-                c.index.end--;
-              }
-              if (pending[i].action === "insert" && pending[i].index <= c.index.start) {
-                c.index.start += pending[i].content.length;
-              }
-              if (pending[i].action === "insert" && pending[i].index <= c.index.end) {
-                c.index.end += pending[i].content.length;
-              }
-              // Replacing could be implemented here, but it's quite the hassle
-            }
-
-            // Check if the text to be styled fits here or not:
-            fitScores = {
-              before: {
-                scores: [],
-                max: -1
-              }, // Check the character before, at, and after the 0 index; score the "at" position based on that. This process will be repeated in the for loop down below.
-              at: (((c.index.start - 1 >= 0 ? t[c.index.start - 1] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start, c.index.end) === c.contentPre) ? 3 : 0) + (((c.index.end < t.length ? t[c.index.end] : false) === c.surrounding.after) ? 1 : 0),
-              after: {
-                scores: [],
-                max: -1
-              },
-              transform: 0
-            };
-
-            // Check how good of a fit styling the character before and after within a certain reach would be:
-            for (let i = 1; i < reach + 1; i++) {
-              fitScores.before.scores.push((((c.index.start - 1 - i >= 0 ? t[c.index.start - 1 - i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start - i, c.index.end - i) === c.contentPre) ? 3 : 0) + (((c.index.end - i < t.length ? t[c.index.end - i] : false) === c.surrounding.after) ? 1 : 0));
-              fitScores.after.scores.push((((c.index.start - 1 + i < t.length ? t[c.index.start - 1 + i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start + i, c.index.end + i) === c.contentPre) ? 3 : 0) + (((c.index.end + i < t.length ? t[c.index.end + i] : false) === c.surrounding.after) ? 1 : 0));
-            }
-
-            // Determine the ideal scores for moving the text to be styled before / after:
-            fitScores.before.max = Math.max(...fitScores.before.scores);
-            fitScores.after.max = Math.max(...fitScores.after.scores);
-
-            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
-            if (fitScores.at !== 5 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
-              // If it's better to remove the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be removed):
-              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
-                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
-
-              // If it's better to remove the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
-              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
-                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
-
-            }
-
-            // Move the styling accordingly:
-            c.index.start += fitScores.transform;
-            c.index.end += fitScores.transform;
 
             // Style the text:
             let addStyle = c.content[0] === "-" ? false : true;
@@ -1927,69 +2098,6 @@
           break;
           case "-link":
           case "link":
-            // Transform the positions:
-            for (let i = 0; i < pending.length; i++) {
-              // The pending text comes before the index where the text is to be linked; therefore, move the link to be inserted over
-              if (pending[i].action === "type" && pending[i].index <= c.index.start) {
-                c.index.start++;
-              }
-              if (pending[i].action === "type" && pending[i].index <= c.index.end) {
-                c.index.end++;
-              }
-              if (pending[i].action === "delete" && pending[i].index <= c.index.start) {
-                c.index.start--;
-              }
-              if (pending[i].action === "delete" && pending[i].index <= c.index.end) {
-                c.index.end--;
-              }
-              if (pending[i].action === "insert" && pending[i].index <= c.index.start) {
-                c.index.start += pending[i].content.length;
-              }
-              if (pending[i].action === "insert" && pending[i].index <= c.index.end) {
-                c.index.end += pending[i].content.length;
-              }
-              // Replacing could be implemented here, but it's quite the hassle
-            }
-
-            // Check if the text to be linked fits here or not:
-            fitScores = {
-              before: {
-                scores: [],
-                max: -1
-              }, // Check the character before, at, and after the 0 index; score the "at" position based on that. This process will be repeated in the for loop down below.
-              at: (((c.index.start - 1 >= 0 ? t[c.index.start - 1] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start, c.index.end) === c.contentPre) ? 3 : 0) + (((c.index.end < t.length ? t[c.index.end] : false) === c.surrounding.after) ? 1 : 0),
-              after: {
-                scores: [],
-                max: -1
-              },
-              transform: 0
-            };
-
-            // Check how good of a fit styling the character before and after within a certain reach would be:
-            for (let i = 1; i < reach + 1; i++) {
-              fitScores.before.scores.push((((c.index.start - 1 - i >= 0 ? t[c.index.start - 1 - i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start - i, c.index.end - i) === c.contentPre) ? 3 : 0) + (((c.index.end - i < t.length ? t[c.index.end - i] : false) === c.surrounding.after) ? 1 : 0));
-              fitScores.after.scores.push((((c.index.start - 1 + i < t.length ? t[c.index.start - 1 + i] : false) === c.surrounding.before) ? 1 : 0) + ((t.substring(c.index.start + i, c.index.end + i) === c.contentPre) ? 3 : 0) + (((c.index.end + i < t.length ? t[c.index.end + i] : false) === c.surrounding.after) ? 1 : 0));
-            }
-
-            // Determine the ideal scores for moving the text to be linked before / after:
-            fitScores.before.max = Math.max(...fitScores.before.scores);
-            fitScores.after.max = Math.max(...fitScores.after.scores);
-
-            // Get the transform (if moving the character achieves a higher score than where it is currently placed):
-            if (fitScores.at !== 5 && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
-              // If it's better to remove the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be removed):
-              if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
-                fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
-
-              // If it's better to remove the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
-              if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
-                fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
-
-            }
-
-            // Move the link accordingly:
-            c.index.start += fitScores.transform;
-            c.index.end += fitScores.transform;
 
             // Link the text:
             let addLink = c.action[0] === "-" ? false : true;
@@ -1997,10 +2105,105 @@
           break;
         }
 
-        // Update cursor position in Firebase (after event finishes):
+        // Update cursor position in Firebase and get active styles (after event finishes):
         setTimeout(function() {
-          set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.getElementById(c.vertex)));
+
+          if (document.activeElement.id) { // [NOTE]
+            activeStyles = getActiveStyles(document.activeElement);
+            setButtons();
+          }
+
+          if (!document.activeElement.classList.contains("link-creator-element"))
+            set(ref(db, `users/${uid}/cursor`), getCaretPosition(document.getElementById(c.vertex)));
         }, 0);
+      }
+
+      function getTransform(c, t) {
+
+        // Setup weights:
+        let weights = { before: 1, at: c.contentPre !== undefined ? 3 : 0, after: 1 };
+
+        // Setup the FitScores object:
+        let fitScores = {
+          before: {
+            scores: [],
+            max: -1
+          },
+          at: 0,
+          after: {
+            scores: [],
+            max: -1
+          },
+          transform: 0
+        };
+
+        // Check to see how good of a fit the intended position is:
+        fitScores.at = getFitScore(c, t, 0, weights);
+
+        // Check how good of a fit the positions before and after the intended position are:
+        let reach = t.length;
+        for (let i = 1; i < reach + 1; i++) {
+          fitScores.before.scores.push(getFitScore(c, t, -i, weights));
+          fitScores.after.scores.push(getFitScore(c, t, i, weights));
+        }
+
+        // Determine the ideal scores for moving the text to be inserted before / after:
+        fitScores.before.max = Math.max(...fitScores.before.scores);
+        fitScores.after.max = Math.max(...fitScores.after.scores);
+
+        // Get the transform (if moving the character achieves a higher score than where it is currently placed):
+        if (fitScores.at !== (weights.before + weights.at + weights.after) && (fitScores.before.max > fitScores.at || fitScores.after.max > fitScores.at)) {
+          // If it's better to place the character before, get the transform accordingly (note that the second half of this conditional checks which of the two (before or after) have an index closer to where the character was expected to be placed):
+          if (fitScores.before.max > fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.before.scores.indexOf(fitScores.before.max) < fitScores.after.scores.indexOf(fitScores.after.max))
+            fitScores.transform = -fitScores.before.scores.indexOf(fitScores.before.max) - 1; // Subtract 1 since arrays start at 0
+
+          // If it's better to place the character after, get the transform accordingly (same as above for the second half of this conditional; we use a <= here since we will place the character after in the event of a tie-breaker):
+          if (fitScores.before.max < fitScores.after.max || fitScores.before.max === fitScores.after.max && fitScores.after.scores.indexOf(fitScores.after.max) <= fitScores.before.scores.indexOf(fitScores.before.max))
+            fitScores.transform = fitScores.after.scores.indexOf(fitScores.after.max) + 1; // Add 1 since arrays start at 0
+        }
+
+        return fitScores.transform;
+
+      }
+
+      function getFitScore(c, t, offset, weights) {
+
+        // Index is out of range (note that characters can be inserted anywhere from 0 to t.length, hence why this is > t.length and not >= t.length):
+        if (c.index.start + offset < 0 || c.index.end + offset > t.length)
+          return 0;
+
+        // Calculate the FitScore at the provided index (with offset included):
+        let fitScore = {
+          // Check the fit before the current offset index:
+          before: (checkFit(t, c.index.start + offset - 1, c.surrounding.before) ? weights.before : 0),
+          // Check the fit of the content at/between the curent indexes (assuming there is content to check):
+          at: (c.contentPre !== undefined && checkFit(t, { start: c.index.start + offset, end: c.index.end + offset }, c.contentPre) ? weights.at : 0),
+          // Check the fit after the current offset index (note that we only need to add 1 to the offset if the action is "delete", or something similar):
+          after: (checkFit(t, c.index.end + offset + ((c.contentPre !== undefined && c.index.start === c.index.end && c.contentPre !== "") ? 1 : 0), c.surrounding.after) ? weights.after : 0)
+        };
+
+        // Return the calculated FitScore:
+        return fitScore.before + fitScore.at + fitScore.after;
+      }
+
+      function checkFit(t, i, compTo) {
+
+        // Handle cases where only one index is being checked:
+        // "i" is the index itself; compare the character at that index to "compTo" (used when checking the before and after surrounding characters):
+        if (i.start === undefined)
+          return ((i >= 0 && i < t.length) ? t[i] : false) === compTo;
+
+        // The start and end indexes are the same, and "compTo" is empty; this happens when "contentPre" in "replace" is empty; this should always return true:
+        if (i.start === i.end && compTo === "")
+          return true;
+
+        // The start and end indexes are the same; compare the character at "i.start" to "compTo":
+        if (i.start === i.end)
+          return ((i.start >= 0 && i.start < t.length) ? t[i.start] : false) === compTo;
+
+        // Handle cases where a group of text (multiple indexes) are being checked:
+        // Grab the entire string of characters from "i.start" to "i.end" and compare them to "compTo":
+        return t.substring(i.start, i.end) === compTo;
       }
 
       async function getData(path, err) {
@@ -2022,6 +2225,11 @@
       }
 
       function buffer(c, isUndoRedo) {
+
+        c.uid = uid;
+        c.timestamp = getTime();
+        c.style = !isUndoRedo ? activeStyles : false;
+
         pending.push(c);
 
         // Handle the undo/redo stack:
@@ -2085,6 +2293,7 @@
 
         // Get the spans:
         let spans = document.activeElement.childNodes;
+        let rect;
 
         // Determine the bounding box of all of the spans:
         let selectionPos = {
@@ -2100,11 +2309,14 @@
 
         // Handle if only 1 character is selected:
         if (pos.start === pos.end) {
-          pos.start--;
-          pos.end++;
+          return {
+            x: rect.left,
+            y: rect.top,
+            w: 0,
+            h: rect.bottom - rect.top
+          };
         }
 
-        let rect;
         for (let i = Math.max(pos.start, 0); i < Math.min(pos.end, spans.length); i++) {
 
           rect = spans[i].getBoundingClientRect();
@@ -2141,7 +2353,16 @@
         }
 
         // Return the color (pad with 4's if not long enough):
-        return `#${t.toString(16).padStart(6, "4")}`;
+
+        let hex = `#${t.toString(16).padStart(6, "4")}`;
+
+        // Hex values starting with "D" (char code = 100) or higher are too bright:
+        for (let i = 1; i < hex.length; i += 2) {
+          if (hex.charCodeAt(i) >= 100) {
+            hex = hex.substring(0, i) + String.fromCharCode(hex.charCodeAt(i) - 3) + hex.substring(i + 1);
+          }
+        }
+        return hex;
       }
 
       function partition(arr, lo, hi, by) {
@@ -2172,6 +2393,33 @@
 
       function copyObj(obj) {
         return JSON.parse(JSON.stringify(obj));
+      }
+
+      function throttle(callback, delay) {
+
+        let runCallback = false;
+        let wait = false;
+        let timeout = () => {
+          if (!runCallback) {
+            wait = false;
+          } else {
+            callback();
+            runCallback = false;
+            setTimeout(timeout, delay);
+          }
+        };
+
+        return () => {
+          if (wait) {
+            runCallback = true;
+            return;
+          }
+
+          callback();
+          wait = true;
+
+          setTimeout(timeout, delay);
+        };
       }
 
     </script>
